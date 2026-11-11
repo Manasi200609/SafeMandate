@@ -1,0 +1,4 @@
+import { useTranslation } from 'react-i18next';
+import { ShieldCheck } from 'lucide-react';
+export default function ShieldScene({compact=false}){const { t } = useTranslation();
+return <div className={`shield-scene ${compact?'shield-compact':''}`} aria-hidden="true"><div className="scene-halo"/><div className="scene-ring ring-one"/><div className="scene-ring ring-two"/><div className="scene-platform platform-back"/><div className="scene-platform platform-front"/><div className="shield-glass"><div className="shield-inner"><ShieldCheck size={compact?45:84} strokeWidth={1.1}/><span className="shield-core-dot"/></div></div><span className="scene-particle particle-a"/><span className="scene-particle particle-b"/><span className="scene-particle particle-c"/><div className="scene-caption"><span className="live-dot"/>{t("copy.enforcement_layer_6a16e5a")}<span className="caption-line"/></div></div>}

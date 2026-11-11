@@ -1,0 +1,15 @@
+{
+  "id": "/app",
+  "name": "Safe Mandate",
+  "short_name": "Safe Mandate",
+  "description": "Autonomous purchasing. Human-controlled money.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0B1428",
+  "theme_color": "#0B1428",
+  "icons": [
+    { "src": "/icons/safe-mandate.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

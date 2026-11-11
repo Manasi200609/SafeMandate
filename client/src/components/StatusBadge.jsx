@@ -1,0 +1,3 @@
+import { useTranslation } from 'react-i18next';
+const styles={NEEDS_GUARDIAN:'status-review',READY_FOR_PAYMENT:'status-ready',GUARDIAN_APPROVED:'status-approved',PAYMENT_PENDING:'status-pending',AUTHORIZED:'status-authorized',MEETUP_ACTIVE:'status-meetup',CAPTURE_PENDING:'status-pending',CAPTURED:'status-captured',VOID_PENDING:'status-pending',VOIDED:'status-muted',BLOCKED:'status-blocked',EXPIRED:'status-muted',PROPOSED:'status-proposed'};
+export default function StatusBadge({status,small=false}){const {t}=useTranslation();const cls=styles[status]??'status-muted';const label=t(`status.${status??'unknown'}`,{defaultValue:status??t('status.unknown')});return <span className={`status-badge ${cls} ${small?'badge-small':''}`}><i/>{label}</span>}

@@ -1,0 +1,6 @@
+import { useTranslation } from 'react-i18next';
+import { useEffect } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { X } from 'lucide-react';
+export default function Modal({open,title,children,onClose,actions}){const { t } = useTranslation();
+useEffect(()=>{if(!open)return;const onKey=e=>{if(e.key==='Escape')onClose();};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);},[open,onClose]);return <AnimatePresence>{open&&<motion.div className="modal-backdrop" role="presentation" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><motion.section className="modal-card" role="dialog" aria-modal="true" aria-label={title} initial={{opacity:0,y:16,scale:.98}} animate={{opacity:1,y:0,scale:1}} exit={{opacity:0,y:10,scale:.98}} transition={{duration:.22}}><div className="modal-head"><div><span className="eyebrow">{t("copy.safe_mandate_09975fe")}</span><h2>{title}</h2></div><button className="icon-button" onClick={onClose} aria-label={t("copy.close_dialog_7b29020")}><X size={18}/></button></div><div className="modal-body">{children}</div>{actions&&<div className="modal-actions">{actions}</div>}</motion.section></motion.div>}</AnimatePresence>}
