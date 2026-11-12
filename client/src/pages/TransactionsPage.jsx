@@ -11,6 +11,11 @@ import PayPalV6CheckoutButton from '../components/PayPalV6CheckoutButton.jsx';
 import { canStartPayPalCheckout } from '../services/transactionDraft.js';
 import './TransactionsPage.css';
 
+function transactionTimestamp(value) {
+  const timestamp = typeof value === 'number' ? value : typeof value === 'string' ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 export default function TransactionsPage() {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
@@ -70,10 +75,10 @@ export default function TransactionsPage() {
   const filtered = useMemo(() => transactions
     .filter((transaction) => (status === 'ALL' || transaction.state === status)
       && `${transaction.transactionId} ${transaction.itemName ?? ''}`.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => sort === 'oldest' ? a.createdAt.localeCompare(b.createdAt)
+    .sort((a, b) => sort === 'oldest' ? transactionTimestamp(a.createdAt) - transactionTimestamp(b.createdAt)
       : sort === 'amount-high' ? b.amountMinor - a.amountMinor
         : sort === 'amount-low' ? a.amountMinor - b.amountMinor
-          : b.createdAt.localeCompare(a.createdAt)), [transactions, status, search, sort]);
+          : transactionTimestamp(b.createdAt) - transactionTimestamp(a.createdAt)), [transactions, status, search, sort]);
 
   return <PageFrame className="app-page"><div className="page-shell subpage-shell">
     <div className="demo-ribbon"><span className="demo-pulse"/>{t('paypalCheckout.liveLabel')}<span className="ribbon-right">{t('paypalCheckout.backendSource')}</span></div>
