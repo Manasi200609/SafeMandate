@@ -22,6 +22,9 @@ function toForm(mandate) {
 
 function errorMessage(error, t) {
   if (error instanceof ApiRequestError && error.code === 'MANDATE_NOT_FOUND') return '';
+  if (error instanceof ApiRequestError && error.code === 'INVALID_CREDENTIALS') return t('mandateSetup.invalidCredentials');
+  if (error instanceof ApiRequestError && error.code === 'RELATIONSHIP_NOT_FOUND') return t('mandateSetup.invitationAccountMismatch');
+  if (error instanceof ApiRequestError && error.code === 'INVITEE_NOT_FOUND') return t('mandateSetup.inviteeAccountRequired');
   return error instanceof ApiRequestError ? error.message : t('mandateSetup.requestFailed');
 }
 
