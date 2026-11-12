@@ -7,7 +7,7 @@ import { request, BUYER, SELLER, MANDATE_BODY, PROPOSAL_BODY, createAcceptedGuar
 
 const MERCHANT = 'SANDBOXMERCHANT123';
 
-function fakePayPal({ captureTimeout = false, orderMismatch = null } = {}) {
+function fakePayPal({ captureTimeout = false, orderMismatch = null, createOrderError = null } = {}) {
   const calls = { create: 0, authorize: 0, capture: 0, void: 0 };
   let orderStatus = 'CREATED';
   let orderDraft;
@@ -36,6 +36,7 @@ function fakePayPal({ captureTimeout = false, orderMismatch = null } = {}) {
     async createOrder(draft) {
       calls.create += 1;
       orderDraft = draft;
+      if (createOrderError) throw createOrderError;
       return { status: 201, data: { id: 'ORDER-123', links: [{ rel: 'approve', href: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER-123' }] } };
     },
     async getOrder() { return { status: 200, data: order() }; },
@@ -124,6 +125,20 @@ test('order and authorization are transaction-bound, use persisted amount, and r
   assert.equal(authReplay.status, 200);
   assert.equal(authReplay.body.replayed, true);
   assert.equal(f.provider.calls.authorize, 1);
+});
+
+test('payment status exposes only the sanitized provider error code for a failed order', async (t) => {
+  const provider = fakePayPal({ createOrderError: new PayPalApiError({ status: 422, issue: 'PAYEE_ACCOUNT_RESTRICTED' }) });
+  const f = await fixture(provider);
+  t.after(f.close);
+  const failed = await createOrder(f);
+  assert.equal(failed.status, 502);
+  const status = await request(f.baseUrl, 'GET', `/api/transactions/${f.transactionId}/payment-status`, { token: f.buyerToken });
+  assert.equal(status.status, 200);
+  assert.equal(status.body.operations[0].status, 'FAILED');
+  assert.equal(status.body.operations[0].providerErrorCode, 'PAYEE_ACCOUNT_RESTRICTED');
+  assert.equal(JSON.stringify(status.body).includes('PayPal Sandbox request failed'), false);
+  assert.equal(provider.calls.create, 1);
 });
 
 test('client cannot supply payment amounts or authorize an unapproved/mismatched order', async (t) => {

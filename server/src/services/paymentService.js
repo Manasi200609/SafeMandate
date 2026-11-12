@@ -32,6 +32,9 @@ function safeOperation(operation) {
     providerResourceId: operation.providerResourceId,
     providerStatus: operation.providerStatus,
     providerTimestamp: operation.providerTimestamp,
+    // Provider error codes are normalized enums; raw provider messages and
+    // response bodies remain private so payment status is safe to expose.
+    providerErrorCode: /^[A-Z0-9_]{1,64}$/.test(operation.providerErrorCode ?? '') ? operation.providerErrorCode : null,
     approvalUrl: operation.approvalUrl,
     amountMinor: operation.amountMinor,
     currency: operation.currency,
