@@ -41,12 +41,16 @@ async function requestJson(path, { method = 'GET', token, body, signal } = {}) {
 }
 
 export async function signInBuyer(email, password) {
-  const result = await requestJson('/api/auth/login', { method: 'POST', body: { email, password } });
+  const result = await signInAccount(email, password);
   if (result?.user?.role !== 'buyer' || typeof result?.token !== 'string') {
     if (typeof result?.token === 'string') await requestJson('/api/auth/logout', { method: 'POST', token: result.token }).catch(() => {});
     throw new ApiRequestError({ status: 403, code: 'BUYER_ACCOUNT_REQUIRED', message: 'Sign in with a buyer account to use the purchase copilot.' });
   }
   return result;
+}
+
+export async function signInAccount(email, password) {
+  return requestJson('/api/auth/login', { method: 'POST', body: { email, password } });
 }
 
 export async function signOut(token) {
@@ -56,6 +60,26 @@ export async function signOut(token) {
 export async function getCurrentMandate(token) {
   const result = await requestJson('/api/mandates/current', { token });
   return result.mandate;
+}
+
+export async function saveCurrentMandate(token, mandate) {
+  const result = await requestJson('/api/mandates/current', { method: 'PUT', token, body: { mandate } });
+  return result.mandate;
+}
+
+export async function getGuardianRelationships(token) {
+  const result = await requestJson('/api/guardian-relationships', { token });
+  return result.relationships;
+}
+
+export async function inviteGuardian(token, guardianEmail) {
+  const result = await requestJson('/api/guardian-relationships', { method: 'POST', token, body: { guardianEmail } });
+  return result.relationship;
+}
+
+export async function acceptGuardianInvitation(token, relationshipId) {
+  const result = await requestJson(`/api/guardian-relationships/${encodeURIComponent(relationshipId)}/accept`, { method: 'POST', token });
+  return result.relationship;
 }
 
 export async function postAiAssessment(token, body, { signal } = {}) {

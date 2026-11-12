@@ -9,6 +9,7 @@ import {
   SELLER,
   request,
   startTestServer,
+  createAcceptedGuardian,
 } from '../helpers/httpHarness.js';
 
 const PASSWORD = BUYER.password;
@@ -157,12 +158,19 @@ test('buyer and seller identities, roles, and transaction ownership are enforced
         body: { email: 'other-buyer@example.test', password: PASSWORD, role: 'buyer' },
       })
     ).body;
+    const guardian = (await request(baseUrl, 'POST', '/api/auth/register', { body: { email: 'guardian@example.test', password: PASSWORD, role: 'seller' } })).body;
+    const invitation = await request(baseUrl, 'POST', '/api/guardian-relationships', { token: buyer.token, body: { guardianEmail: guardian.user.email } });
+    assert.equal(invitation.status, 201);
+    const pendingMandate = await request(baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId } } });
+    assert.equal(pendingMandate.status, 409);
+    assert.equal(pendingMandate.body.error.code, 'GUARDIAN_NOT_ELIGIBLE');
+    await request(baseUrl, 'POST', `/api/guardian-relationships/${invitation.body.relationship.relationshipId}/accept`, { token: guardian.token });
 
     assert.equal((await request(baseUrl, 'POST', '/api/transactions', { body: { sellerId: seller.user.userId, proposal: PROPOSAL_BODY } })).status, 401);
     assert.equal((await request(baseUrl, 'PUT', '/api/mandates/current', { token: seller.token, body: { mandate: MANDATE_BODY } })).status, 403);
     assert.equal((await request(baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: { ...MANDATE_BODY, maxAmountMinor: 0 } } })).status, 400);
 
-    const saved = await request(baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: MANDATE_BODY } });
+    const saved = await request(baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId } } });
     assert.equal(saved.status, 200);
     assert.match(saved.body.mandate.mandateId, /^mandate_/);
     assert.notEqual(saved.body.mandate.mandateId, MANDATE_BODY.mandateId);
@@ -170,6 +178,13 @@ test('buyer and seller identities, roles, and transaction ownership are enforced
     const current = await request(baseUrl, 'GET', '/api/mandates/current', { token: buyer.token });
     assert.equal(current.status, 200);
     assert.equal(current.body.mandate.maxAmountMinor, MANDATE_BODY.maxAmountMinor);
+    assert.equal((await request(baseUrl, 'GET', '/api/mandates/current', { token: otherBuyer.token })).body.error.code, 'MANDATE_NOT_FOUND');
+    const reusedGuardian = await request(baseUrl, 'PUT', '/api/mandates/current', { token: otherBuyer.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId } } });
+    assert.equal(reusedGuardian.status, 409);
+    const update = await request(baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId, maxAmountMinor: 1_600_000 } } });
+    assert.equal(update.status, 200);
+    assert.notEqual(update.body.mandate.mandateId, saved.body.mandate.mandateId);
+    assert.equal((await request(baseUrl, 'GET', '/api/mandates/current', { token: buyer.token })).body.mandate.maxAmountMinor, 1_600_000);
 
     const sellerCannotCreate = await request(baseUrl, 'POST', '/api/transactions', {
       token: seller.token,
@@ -271,7 +286,8 @@ test('transactions survive an app restart against the same persistent store', as
     const buyer = (await request(first.baseUrl, 'POST', '/api/auth/register', { body: BUYER })).body;
     const seller = (await request(first.baseUrl, 'POST', '/api/auth/register', { body: SELLER })).body;
     buyerToken = buyer.token;
-    await request(first.baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: MANDATE_BODY } });
+    const guardian = await createAcceptedGuardian(first.baseUrl, buyer.token, 'guardian@restart.test');
+    await request(first.baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId } } });
     const created = await request(first.baseUrl, 'POST', '/api/transactions', {
       token: buyer.token,
       body: { sellerId: seller.user.userId, proposal: PROPOSAL_BODY },

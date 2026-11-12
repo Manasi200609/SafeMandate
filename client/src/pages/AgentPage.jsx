@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, ArrowRight, Check, Clipboard, FileSearch, KeyRound, LogOut, MessageSquareText, ShieldCheck, Sparkles } from 'lucide-react';
 import PageFrame from '../components/PageFrame.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { ApiRequestError, getCurrentMandate, postAiAssessment, signInBuyer, signOut } from '../services/api.js';
 import { CURRENCY_MINOR_UNITS } from '../data/currencyMeta.js';
+import { classifyPersistedMandate } from '../services/mandateStatus.js';
 import { money } from '../services/format.js';
 import './AgentPage.css';
 
@@ -33,6 +35,8 @@ export default function AgentPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mandate, setMandate] = useState(null);
+  const [mandateStatus, setMandateStatus] = useState('missing');
+  const [mandateLoading, setMandateLoading] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -54,12 +58,10 @@ export default function AgentPage() {
     setLoginBusy(true);
     try {
       const session = await signInBuyer(email.trim(), password);
-      const storedMandate = await getCurrentMandate(session.token);
       setToken(session.token);
       setBuyerName(session.user.displayName || session.user.email);
-      setMandate(storedMandate);
-      setCategory(storedMandate.allowedCategories?.[0] ?? '');
       setPassword('');
+      await refreshMandate(session.token);
     } catch (requestError) {
       setError(requestError instanceof ApiRequestError ? requestError.message : t('ai.error'));
     } finally {
@@ -67,11 +69,28 @@ export default function AgentPage() {
     }
   }
 
+  async function refreshMandate(sessionToken = token) {
+    setMandateLoading(true);
+    setError('');
+    try {
+      const saved = await getCurrentMandate(sessionToken);
+      const state = classifyPersistedMandate(saved);
+      if (state !== 'ready') { setMandate(null); setMandateStatus(state); return; }
+      setMandate(saved); setMandateStatus('ready'); setCategory(saved.allowedCategories[0] ?? '');
+    } catch (requestError) {
+      setMandate(null);
+      if (requestError instanceof ApiRequestError && requestError.code === 'MANDATE_NOT_FOUND') setMandateStatus('missing');
+      else if (requestError instanceof ApiRequestError && ['INVALID_MANDATE', 'MANDATE_INVALID'].includes(requestError.code)) setMandateStatus('invalid');
+      else { setMandateStatus('unavailable'); setError(requestError instanceof ApiRequestError ? requestError.message : t('ai.error')); }
+    } finally { setMandateLoading(false); }
+  }
+
   async function handleSignOut() {
     try { await signOut(token); } catch { /* The in-memory token is still discarded. */ }
     setToken('');
     setBuyerName('');
     setMandate(null);
+    setMandateStatus('missing');
     setResult(null);
     setError('');
   }
@@ -145,7 +164,7 @@ export default function AgentPage() {
       <p className="copilot-disclosure"><ShieldCheck size={14}/>{t('ai.signInBody')}</p>
       {error && <p className="copilot-error" role="alert"><AlertTriangle size={15}/>{error}</p>}
     </section> : <>
-      {mandate ? <div className="copilot-mandate-strip"><ShieldCheck size={16}/><span>Saved mandate</span><b>{money(mandate.maxAmountMinor, mandate.currency)} · {mandate.allowedCategories.join(', ')}</b><button type="button" className="copilot-signout" onClick={handleSignOut}><LogOut size={13}/>{t('ai.signOut')}</button></div> : <div role="status" className="copilot-loading">{t('ai.loadingMandate')}</div>}
+      {mandate ? <div className="copilot-mandate-strip"><ShieldCheck size={16}/><span>{t('ai.savedMandateLabel')}</span><b>{money(mandate.maxAmountMinor, mandate.currency)} · {mandate.allowedCategories.join(', ')}</b><button type="button" className="copilot-signout" onClick={() => refreshMandate()} disabled={mandateLoading}><ArrowRight size={13}/>{t('ai.refreshMandate')}</button><button type="button" className="copilot-signout" onClick={handleSignOut}><LogOut size={13}/>{t('ai.signOut')}</button></div> : <div role="status" className="copilot-mandate-state"><div>{mandateLoading ? t('ai.loadingMandate') : t(({ missing: 'ai.mandateMissing', expired: 'ai.mandateExpired', invalid: 'ai.mandateInvalid', unavailable: 'ai.mandateUnavailable' })[mandateStatus])}</div>{mandateStatus !== 'unavailable' && !mandateLoading && <Link className="button button-lime button-small" to="/app/mandate">{t('ai.openMandateSetup')}<ArrowRight size={13}/></Link>}{mandateStatus === 'unavailable' && <button type="button" className="button button-outline button-small" onClick={() => refreshMandate()}>{t('ai.refreshMandate')}</button>}</div>}
       <div className="agent-workspace copilot-workspace">
         <section className="agent-conversation panel copilot-form-panel">
           <div className="conversation-head"><div className="conversation-avatar"><FileSearch size={17}/></div><div><b>{t('ai.analysisHeader')}</b><small>OpenAI-compatible model · no payment tools</small></div><span className="sample-tag">ADVISORY</span></div>

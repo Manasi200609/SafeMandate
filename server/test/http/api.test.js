@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApp } from '../../src/app.js';
+import { getConfig } from '../../src/config/env.js';
 import { getHealth } from '../../src/controllers/healthController.js';
 import { postValidateMandate } from '../../src/controllers/mandateController.js';
 import { postEvaluateProposal } from '../../src/controllers/policyController.js';
@@ -82,6 +83,16 @@ test('development frontend CORS origin is allowed and other origins are rejected
   cors({ get: () => 'https://example.invalid', method: 'GET' }, rejectedRes, () => assert.fail('unapproved origin passed'));
   assert.equal(rejectedRes.code, 403);
   assert.equal(rejectedRes.body.error.code, 'ORIGIN_NOT_ALLOWED');
+});
+
+test('production CORS preflight permits the canonical Safe Mandate Vercel origin', () => {
+  const mongoUri = 'mongodb://user:pass@atlas-a.mongodb.net:27017/safe_mandate';
+  const config = getConfig({ NODE_ENV: 'production', MONGODB_URI: mongoUri, PORT: '43130', FRONTEND_ORIGINS: 'https://preview.example' });
+  const cors = createCorsMiddleware(config.frontendOrigins);
+  const res = responseRecorder();
+  cors({ get: (name) => name.toLowerCase() === 'origin' ? 'https://safemandate.vercel.app' : null, method: 'OPTIONS' }, res, () => assert.fail('preflight should terminate in CORS middleware'));
+  assert.equal(res.code, 204);
+  assert.equal(res.headers['access-control-allow-origin'], 'https://safemandate.vercel.app');
 });
 
 test('POST /api/mandates/validate controller delegates to the existing validator', () => {

@@ -27,6 +27,17 @@ test('production requires an explicit MongoDB URI but no unrelated session secre
   assert.equal(valid.host, '0.0.0.0');
   assert.equal(valid.port, 43127);
   assert.equal(valid.mongodbUri, mongoUri);
+  assert.ok(valid.frontendOrigins.includes('https://safemandate.vercel.app'));
+});
+
+test('production keeps the canonical frontend allowed alongside explicitly configured origins', () => {
+  const config = getConfig({
+    NODE_ENV: 'production',
+    MONGODB_URI: 'mongodb://user:pass@atlas-a.mongodb.net:27017/safe_mandate',
+    PORT: '43129',
+    FRONTEND_ORIGINS: 'https://preview.example',
+  });
+  assert.deepEqual(config.frontendOrigins, ['https://preview.example', 'https://safemandate.vercel.app']);
 });
 
 test('production only accepts an all-interface host, while development may explicitly bind elsewhere', () => {

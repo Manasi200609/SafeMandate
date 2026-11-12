@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createMemoryRepositories } from '../../src/persistence/memoryRepositories.js';
 import { PayPalApiError } from '../../src/integrations/paypal/paypalTransport.js';
 import { PayPalConfigurationError } from '../../src/integrations/paypal/configuredAdapter.js';
-import { request, BUYER, SELLER, MANDATE_BODY, PROPOSAL_BODY, registerUser } from '../helpers/httpHarness.js';
+import { request, BUYER, SELLER, MANDATE_BODY, PROPOSAL_BODY, createAcceptedGuardian, registerUser } from '../helpers/httpHarness.js';
 
 const MERCHANT = 'SANDBOXMERCHANT123';
 
@@ -71,7 +71,8 @@ async function fixture(provider = fakePayPal()) {
   const seller = await registerUser(baseUrl, SELLER);
   const buyerToken = buyer.body.token;
   const sellerToken = seller.body.token;
-  const saved = await request(baseUrl, 'PUT', '/api/mandates/current', { token: buyerToken, body: { mandate: MANDATE_BODY } });
+  const guardian = await createAcceptedGuardian(baseUrl, buyerToken, 'guardian@payments.test');
+  const saved = await request(baseUrl, 'PUT', '/api/mandates/current', { token: buyerToken, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId } } });
   assert.equal(saved.status, 200);
   const created = await request(baseUrl, 'POST', '/api/transactions', { token: buyerToken, body: { sellerId: seller.body.user.userId, proposal: PROPOSAL_BODY } });
   assert.equal(created.status, 201);
@@ -209,7 +210,8 @@ test('missing PayPal config fails closed at operation time without breaking heal
   t.after(() => new Promise((resolve) => server.close(resolve)));
   assert.equal((await request(baseUrl, 'GET', '/api/health')).status, 200);
   const buyer = await registerUser(baseUrl, BUYER);
-  await request(baseUrl, 'PUT', '/api/mandates/current', { token: buyer.body.token, body: { mandate: MANDATE_BODY } });
+  const guardian = await createAcceptedGuardian(baseUrl, buyer.body.token, 'guardian@payments-unconfigured.test');
+  await request(baseUrl, 'PUT', '/api/mandates/current', { token: buyer.body.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId } } });
   const seller = await registerUser(baseUrl, SELLER);
   const tx = await request(baseUrl, 'POST', '/api/transactions', { token: buyer.body.token, body: { sellerId: seller.body.user.userId, proposal: PROPOSAL_BODY } });
   await request(baseUrl, 'POST', `/api/transactions/${tx.body.transaction.transactionId}/evaluate`, { token: buyer.body.token });

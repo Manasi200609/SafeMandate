@@ -46,13 +46,19 @@ export function createGuardianService(repositories) {
 
   async function list({ principal }) {
     if (principal?.role !== 'buyer') throw new ApiError(403, 'ROLE_NOT_PERMITTED', 'Only a buyer may view guardian invitations.');
-    return repositories.guardianRelationships.listForBuyer(principal.userId);
+    const relationships = await repositories.guardianRelationships.listForBuyer(principal.userId);
+    return Promise.all(relationships.map(async (relationship) => {
+      const guardian = await repositories.users.findByUserId(relationship.guardianId);
+      return { ...relationship, eligible: relationship.status === 'ACCEPTED' && guardian?.role === 'guardian' && guardian?.accountStatus === 'ACTIVE' };
+    }));
   }
 
   async function assertAccepted({ buyerId, guardianId }) {
     if (!guardianId || guardianId === buyerId) throw new ApiError(403, 'GUARDIAN_NOT_ELIGIBLE', 'This transaction has no eligible guardian.');
     const relationship = await repositories.guardianRelationships.findAccepted(buyerId, guardianId);
     if (!relationship) throw new ApiError(403, 'GUARDIAN_NOT_ACCEPTED', 'The designated guardian relationship is not accepted.');
+    const guardian = await repositories.users.findByUserId(guardianId);
+    if (guardian?.role !== 'guardian' || guardian?.accountStatus !== 'ACTIVE') throw new ApiError(403, 'GUARDIAN_NOT_ELIGIBLE', 'The designated guardian account is not active and eligible.');
     return relationship;
   }
 

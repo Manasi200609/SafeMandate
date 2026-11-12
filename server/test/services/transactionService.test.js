@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { createMemoryRepositories } from '../../src/persistence/memoryRepositories.js';
 import { createAuthService } from '../../src/services/authService.js';
 import { createMandateService } from '../../src/services/mandateService.js';
+import { createGuardianService } from '../../src/services/guardianService.js';
 import { createTransactionService } from '../../src/services/transactionService.js';
 import { hydrateTransaction, serializeTransaction, transitionTransaction } from '../../src/domain/transactions/transitionTransaction.js';
 import { MANDATE_BODY, PROPOSAL_BODY } from '../helpers/httpHarness.js';
@@ -14,13 +15,16 @@ async function seed() {
   const repositories = createMemoryRepositories();
   const authService = createAuthService(repositories);
   const mandateService = createMandateService(repositories);
+  const guardianService = createGuardianService(repositories);
   const transactionService = createTransactionService(repositories);
 
   const buyer = (await authService.register({ email: 'buyer@service.test', password: 'correct-horse-battery', role: 'buyer' })).user;
   const seller = (await authService.register({ email: 'seller@service.test', password: 'correct-horse-battery', role: 'seller' })).user;
   const stranger = (await authService.register({ email: 'stranger@service.test', password: 'correct-horse-battery', role: 'buyer' })).user;
-
-  await mandateService.saveMandate({ principal: buyer, body: MANDATE_BODY });
+  const guardianAccount = (await authService.register({ email: 'guardian@service.test', password: 'correct-horse-battery', role: 'seller' })).user;
+  const invitation = await guardianService.invite({ principal: buyer, body: { guardianEmail: guardianAccount.email } });
+  await guardianService.accept({ principal: guardianAccount, relationshipId: invitation.relationshipId });
+  await mandateService.saveMandate({ principal: buyer, body: { ...MANDATE_BODY, guardianId: guardianAccount.userId } });
   const transaction = await transactionService.createTransaction({
     principal: buyer,
     body: { sellerId: seller.userId, proposal: PROPOSAL_BODY },

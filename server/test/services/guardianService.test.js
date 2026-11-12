@@ -22,6 +22,8 @@ test('guardian role cannot be self-selected; relationship requires invited accou
   await assert.rejects(guardians.accept({ principal: buyerResult.user, relationshipId: invitation.relationshipId }), (error) => error.status === 404);
   const accepted = await guardians.accept({ principal: invitee.user, relationshipId: invitation.relationshipId });
   assert.equal(accepted.status, 'ACCEPTED');
+  const buyerRelationships = await guardians.list({ principal: buyerResult.user });
+  assert.equal(buyerRelationships[0].eligible, true);
   assert.equal((await repositories.users.findByUserId(invitee.user.userId)).role, 'guardian');
   assert.equal(await repositories.guardianRelationships.findAccepted(buyerResult.user.userId, invitee.user.userId) !== null, true);
   const repeatAcceptance = await guardians.accept({ principal: invitee.user, relationshipId: invitation.relationshipId });

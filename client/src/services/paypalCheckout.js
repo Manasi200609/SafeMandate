@@ -1,3 +1,5 @@
+import { canStartPayPalCheckout } from './transactionDraft.js';
+
 export const PAYPAL_HANDOFF_KEY = 'safe-mandate-paypal-handoff';
 const MAX_HANDOFF_AGE_MS = 8 * 60 * 60 * 1000;
 const checkoutsInFlight = new Set();
@@ -62,13 +64,84 @@ export async function startPayPalCheckout({ transaction, token, createOrder, sto
   }
 }
 
-function isConfirmedAuthorization(payment, transaction) {
+export function isConfirmedAuthorization(payment, transaction) {
   const authorization = payment?.operations?.find((operation) => operation.kind === 'AUTHORIZE');
   return payment?.state === 'AUTHORIZED' && transaction?.state === 'AUTHORIZED'
     && typeof transaction?.provider?.authorizationId === 'string'
     && authorization?.status === 'COMPLETED'
     && authorization.providerStatus === 'CREATED'
     && authorization.providerResourceId === transaction.provider.authorizationId;
+}
+
+export function hasUnresolvedCheckoutOperation(payment) {
+  return payment?.operations?.some((operation) => ['PENDING', 'UNKNOWN'].includes(operation.status)
+    || (operation.kind === 'AUTHORIZE' && operation.status === 'COMPLETED')) === true;
+}
+
+export function hasFailedCheckoutOperation(payment) {
+  return payment?.operations?.some((operation) => ['CREATE_ORDER', 'AUTHORIZE'].includes(operation.kind)
+    && operation.status === 'FAILED') === true;
+}
+
+export function getPayPalCheckoutState(payment, transaction) {
+  if (payment?.provider?.orderId !== transaction?.provider?.orderId) return 'unresolved';
+  if (isConfirmedAuthorization(payment, transaction)) return 'authorized';
+  if (hasUnresolvedCheckoutOperation(payment) || hasFailedCheckoutOperation(payment)) return 'unresolved';
+  return canStartPayPalCheckout(transaction?.state) ? 'ready' : 'ineligible';
+}
+
+export async function verifyPayPalApproval({ orderId, transactionId, token, getPaymentStatus, getTransaction, authorize, reconcile }) {
+  if (typeof orderId !== 'string' || !orderId || !transactionId || !token) return { kind: 'missing-order' };
+  const [payment, transaction] = await Promise.all([
+    getPaymentStatus(transactionId, token),
+    getTransaction(transactionId, token),
+  ]);
+  if (payment?.provider?.orderId !== orderId || transaction?.provider?.orderId !== orderId) return { kind: 'order-mismatch' };
+  if (isConfirmedAuthorization(payment, transaction)) return { kind: 'authorized', transactionId };
+  if (payment.state !== 'PAYMENT_PENDING' || transaction.state !== 'PAYMENT_PENDING') return { kind: 'not-authorizable', state: transaction.state };
+
+  try {
+    const result = await authorize(transactionId, token, transaction.version);
+    if (result?.operation?.kind === 'AUTHORIZE' && result.operation.status === 'COMPLETED'
+      && result.operation.providerStatus === 'CREATED' && typeof result.operation.providerResourceId === 'string') {
+      const confirmed = await fetchAuthorizationState({ transactionId, token, orderId, getPaymentStatus, getTransaction });
+      if (confirmed) return { kind: 'authorized', transactionId };
+    }
+    if (!['PENDING', 'UNKNOWN'].includes(result?.operation?.status)) return { kind: 'unresolved', transactionId };
+  } catch (error) {
+    if (!['PAYMENT_OUTCOME_UNKNOWN', 'PAYPAL_STATUS_UNAVAILABLE', 'PAYPAL_RECONCILIATION_FAILED', 'API_UNAVAILABLE'].includes(error?.code)) throw error;
+  }
+  if (typeof reconcile === 'function') {
+    await reconcile(transactionId, token);
+    if (await fetchAuthorizationState({ transactionId, token, orderId, getPaymentStatus, getTransaction })) return { kind: 'authorized', transactionId };
+  }
+  return { kind: 'unresolved', transactionId };
+}
+
+async function fetchAuthorizationState({ transactionId, token, orderId, getPaymentStatus, getTransaction }) {
+  const [payment, transaction] = await Promise.all([
+    getPaymentStatus(transactionId, token),
+    getTransaction(transactionId, token),
+  ]);
+  return payment?.provider?.orderId === orderId && transaction?.provider?.orderId === orderId
+    && isConfirmedAuthorization(payment, transaction);
+}
+
+/** Read persisted provider state and reconcile only operations already marked pending or unknown. */
+export async function recoverPayPalSdkError({ transactionId, token, getPaymentStatus, getTransaction, reconcile }) {
+  const payment = await getPaymentStatus(transactionId, token);
+  const hasAmbiguousOperation = payment?.operations?.some((operation) => ['PENDING', 'UNKNOWN'].includes(operation.status));
+  if (hasAmbiguousOperation) await reconcile(transactionId, token);
+  const [freshPayment, transaction] = await Promise.all([
+    getPaymentStatus(transactionId, token),
+    getTransaction(transactionId, token),
+  ]);
+  if (freshPayment?.provider?.orderId !== transaction?.provider?.orderId) return { kind: 'order-mismatch' };
+  const checkoutState = getPayPalCheckoutState(freshPayment, transaction);
+  return checkoutState === 'authorized'
+    ? { kind: 'authorized', transactionId }
+    : checkoutState === 'unresolved' ? { kind: 'unresolved', transactionId }
+      : { kind: 'not-authorized', state: transaction?.state };
 }
 
 export async function verifyPayPalReturn({ search, storage = globalThis.sessionStorage, getPaymentStatus, getTransaction, authorize, now = Date.now() }) {

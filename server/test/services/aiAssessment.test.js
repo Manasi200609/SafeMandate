@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createMemoryRepositories } from '../../src/persistence/memoryRepositories.js';
 import { AiConfigurationError } from '../../src/integrations/ai/openAiCompatibleProvider.js';
-import { BUYER, MANDATE_BODY, PROPOSAL_BODY, SELLER, request, startTestServer } from '../helpers/httpHarness.js';
+import { BUYER, MANDATE_BODY, PROPOSAL_BODY, SELLER, createAcceptedGuardian, request, startTestServer } from '../helpers/httpHarness.js';
 
 const listing = 'Wireless headphones, used, works well. Seller says pickup at a public cafe.';
 
@@ -43,7 +43,8 @@ async function setup(t, response = assessment()) {
   });
   t.after(running.close);
   const buyer = (await request(running.baseUrl, 'POST', '/api/auth/register', { body: BUYER })).body;
-  await request(running.baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: MANDATE_BODY } });
+  const guardian = await createAcceptedGuardian(running.baseUrl, buyer.token, 'guardian@ai.test');
+  await request(running.baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId } } });
   return { ...running, repositories, buyer, get calls() { return calls; }, get providerInput() { return providerInput; }, get paymentAdapterCreations() { return paymentAdapterCreations; } };
 }
 
@@ -136,7 +137,8 @@ test('provider unavailable returns explicit configuration error without fabricat
   const running = await startTestServer(repositories, {}, { aiProviderFactory: () => { throw new AiConfigurationError(); } });
   t.after(running.close);
   const buyer = (await request(running.baseUrl, 'POST', '/api/auth/register', { body: BUYER })).body;
-  await request(running.baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: MANDATE_BODY } });
+  const guardian = await createAcceptedGuardian(running.baseUrl, buyer.token, 'guardian@ai-unconfigured.test');
+  await request(running.baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId } } });
   const result = await request(running.baseUrl, 'POST', '/api/ai/assessments', { token: buyer.token, body: input() });
   assert.equal(result.status, 503);
   assert.equal(result.body.error.code, 'AI_NOT_CONFIGURED');

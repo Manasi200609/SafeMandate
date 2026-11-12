@@ -14,7 +14,7 @@ import { HandoffConfirmation } from '../../src/models/HandoffConfirmation.js';
 import { PaymentOperation } from '../../src/models/PaymentOperation.js';
 import { AiAssessmentAudit } from '../../src/models/AiAssessmentAudit.js';
 import { isSafeLocalTestDatabaseUri } from '../helpers/testDatabaseSafety.js';
-import { BUYER, MANDATE_BODY, PROPOSAL_BODY, SELLER, request, startTestServer } from '../helpers/httpHarness.js';
+import { BUYER, MANDATE_BODY, PROPOSAL_BODY, SELLER, createAcceptedGuardian, request, startTestServer } from '../helpers/httpHarness.js';
 
 const TEST_URI = process.env.MONGODB_URI_TEST ?? '';
 
@@ -46,8 +46,8 @@ test('MongoDB persists identities, mandates, transactions, audits, sessions, and
     const buyer = (await request(first.baseUrl, 'POST', '/api/auth/register', { body: BUYER })).body;
     const seller = (await request(first.baseUrl, 'POST', '/api/auth/register', { body: SELLER })).body;
     buyerToken = buyer.token;
-
-    await request(first.baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: MANDATE_BODY } });
+    const guardian = await createAcceptedGuardian(first.baseUrl, buyer.token, 'guardian@persistence.test');
+    await request(first.baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId } } });
     const created = await request(first.baseUrl, 'POST', '/api/transactions', {
       token: buyer.token,
       body: { sellerId: seller.user.userId, proposal: PROPOSAL_BODY },

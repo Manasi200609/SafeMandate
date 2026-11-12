@@ -1,4 +1,7 @@
 const DEFAULT_FRONTEND_ORIGINS = ['http://127.0.0.1:5173', 'http://localhost:5173'];
+// Keep the one deployed Safe Mandate frontend available even when a Render
+// environment value is missing or lists only preview/development origins.
+const CANONICAL_PRODUCTION_FRONTEND_ORIGINS = ['https://safemandate.vercel.app'];
 const DEFAULT_MONGODB_URI = 'mongodb://127.0.0.1:27017/safe_mandate';
 import { isValidMongoUri } from './mongoUri.js';
 
@@ -48,11 +51,16 @@ function readConfig(env, { validatePort }) {
     throw new TypeError('HOST must be 0.0.0.0 in production.');
   }
 
+  const frontendOrigins = new Set(configuredOrigins?.length ? configuredOrigins : DEFAULT_FRONTEND_ORIGINS);
+  if (nodeEnv === 'production') {
+    for (const origin of CANONICAL_PRODUCTION_FRONTEND_ORIGINS) frontendOrigins.add(origin);
+  }
+
   return Object.freeze({
     nodeEnv,
     port: parsedPort,
     host,
-    frontendOrigins: Object.freeze(configuredOrigins?.length ? configuredOrigins : DEFAULT_FRONTEND_ORIGINS),
+    frontendOrigins: Object.freeze([...frontendOrigins]),
     mongodbUri: configuredMongoUri || DEFAULT_MONGODB_URI,
     mongoServerSelectionTimeoutMs: parseInteger(env, 'MONGODB_SERVER_SELECTION_TIMEOUT_MS', 5000, 100, 60000),
     sessionTtlMinutes: parseInteger(env, 'SESSION_TTL_MINUTES', 480, 5, 1440),

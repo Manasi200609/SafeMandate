@@ -89,3 +89,13 @@ export async function registerUser(baseUrl, user) {
 export async function loginUser(baseUrl, email, password) {
   return request(baseUrl, 'POST', '/api/auth/login', { body: { email, password } });
 }
+
+export async function createAcceptedGuardian(baseUrl, buyerToken, email = 'guardian@example.test') {
+  const account = await registerUser(baseUrl, { email, password: BUYER.password, role: 'seller' });
+  const invitation = await request(baseUrl, 'POST', '/api/guardian-relationships', {
+    token: buyerToken, body: { guardianEmail: account.body.user.email },
+  });
+  const relationshipId = invitation.body.relationship.relationshipId;
+  const accepted = await request(baseUrl, 'POST', `/api/guardian-relationships/${relationshipId}/accept`, { token: account.body.token });
+  return { user: account.body.user, token: account.body.token, relationship: accepted.body.relationship };
+}

@@ -1,34 +1,186 @@
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useState } from 'react';
-import { AlertCircle, ArrowRight, Check, ChevronDown, CircleHelp, Clock3, Save, ShieldCheck, Undo2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Check, KeyRound, LoaderCircle, LogOut, RefreshCw, ShieldCheck, UserPlus } from 'lucide-react';
 import PageFrame from '../components/PageFrame.jsx';
-import Modal from '../components/Modal.jsx';
-import { demoService } from '../services/demoService.js';
+import { ApiRequestError, acceptGuardianInvitation, getCurrentMandate, getGuardianRelationships, inviteGuardian, saveCurrentMandate, signInAccount, signInBuyer, signOut } from '../services/api.js';
 import { CURRENCY_MINOR_UNITS } from '../data/currencyMeta.js';
-import { money, dateLabel } from '../services/format.js';
-import { useToast } from '../components/ToastContext.jsx';
-const categories=['Electronics','Home & living','Outdoor','Books','Fashion','Other'];
-const zones=['Asia/Kolkata','Asia/Dubai','Europe/London','America/New_York','America/Los_Angeles','UTC'];
-function parseMinor(value,currency){const exponent=CURRENCY_MINOR_UNITS[currency]??2;const match=/^(\d+)(?:\.(\d*))?$/.exec(value.trim());if(!match)return null;const fraction=match[2]??'';if(fraction.length>exponent)return null;const whole=Number(match[1]);const minor=whole*10**exponent+Number((fraction+'0'.repeat(exponent)).slice(0,exponent)||0);return Number.isSafeInteger(minor)&&minor>0?minor:null;}
-const toMajor=(minor,currency)=>{const exp=CURRENCY_MINOR_UNITS[currency]??2;if(!exp)return String(minor);const scale=10**exp;return String(Math.floor(minor/scale))+'.'+String(minor%scale).padStart(exp,'0');};
-export default function MandatePage(){const { t } = useTranslation();
-const initial=demoService.getMandate();const [form,setForm]=useState(()=>({...initial,...initial.meetupRules,amountText:toMajor(initial.maxAmountMinor,initial.currency),expiry:initial.expiresAt.slice(0,10),riskThreshold:String(initial.riskThreshold)}));const [errors,setErrors]=useState({});const [confirm,setConfirm]=useState(false);const notify=useToast();
- const update=(key,value)=>setForm(f=>({...f,[key]:value}));
- const toggle=(category)=>setForm(f=>({...f,allowedCategories:f.allowedCategories.includes(category)?f.allowedCategories.filter(c=>c!==category):[...f.allowedCategories,category]}));
- const validate=()=>{const e={};const minor=parseMinor(form.amountText,form.currency);if(minor===null)e.amountText=t('validation.amount',{decimals:CURRENCY_MINOR_UNITS[form.currency]});if(!form.allowedCategories.length)e.allowedCategories=t('validation.categories');if(form.daytimeStart>=form.daytimeEnd)e.daytimeEnd=t('validation.time');if(!form.expiry)e.expiry=t('validation.expiryRequired');else if(new Date(`${form.expiry}T23:59:59Z`)<new Date('2026-11-09T00:00:00Z'))e.expiry=t('validation.expiryPast');if(!form.guardianId)e.guardianId=t('validation.guardian');setErrors(e);return Object.keys(e).length===0;};
- const requestSave=e=>{e.preventDefault();if(validate())setConfirm(true);};
- const save=()=>{const next={mandateId:form.mandateId,maxAmountMinor:parseMinor(form.amountText,form.currency),currency:form.currency,allowedCategories:form.allowedCategories,meetupRules:{requirePublicPlace:form.meetupRules.requirePublicPlace,daytimeStart:form.daytimeStart,daytimeEnd:form.daytimeEnd,timeZone:form.timeZone},expiresAt:`${form.expiry}T23:59:59Z`,guardianId:form.guardianId,riskThreshold:Number(form.riskThreshold)};demoService.saveMandate(next);setForm({...next,amountText:toMajor(next.maxAmountMinor,next.currency),expiry:next.expiresAt.slice(0,10),daytimeStart:next.meetupRules.daytimeStart,daytimeEnd:next.meetupRules.daytimeEnd,timeZone:next.meetupRules.timeZone});setConfirm(false);notify(t('toast.mandateSaved'));};
- const cancel=()=>{const m=demoService.getMandate();setForm({...m,amountText:toMajor(m.maxAmountMinor,m.currency),expiry:m.expiresAt.slice(0,10),daytimeStart:m.meetupRules.daytimeStart,daytimeEnd:m.meetupRules.daytimeEnd,timeZone:m.meetupRules.timeZone});setErrors({});notify(t('toast.editsDiscarded'));};
- return <PageFrame className="app-page"><div className="page-shell subpage-shell"><div className="demo-ribbon"><span className="demo-pulse"/>{t('demo.source')}<span className="ribbon-right">{t("copy.local_preview_only_af08e9b")}</span></div><div className="subpage-heading"><div><span className="eyebrow"><ShieldCheck size={13}/>{t("copy.control_your_boundaries_9922485")}</span><h1>{t("copy.your_rules_a5d3d29")}<em>{t("copy.clearly_set_3b3774b")}</em></h1><p>{t("copy.changes_are_saved_to_this_browser_prev_8e28944")}</p></div><div className="mandate-status"><span className="active-state"><i/>{t("copy.active_1df0eaf")}</span><small>{t("copy.expires_9310120")}{dateLabel(form.expiry)}</small></div></div>
- <form className="mandate-layout" onSubmit={requestSave} noValidate><div className="mandate-form-column">
-  <section className="panel form-section"><div className="form-section-head"><span className="form-number">{t("copy.01_ddfe163")}</span><div><span className="eyebrow">{t("copy.spending_boundary_f260918")}</span><h2>{t("copy.maximum_purchase_7a652c5")}</h2><p>{t("copy.set_the_highest_amount_a_single_propos_344c65d")}</p></div></div><div className="amount-field-wrap"><label htmlFor="max-amount">{t("copy.maximum_per_purchase_85d79b2")}</label><div className={`amount-input ${errors.amountText?'has-error':''}`}><span>{form.currency==='INR'?'₹':form.currency}</span><input id="max-amount" inputMode="decimal" value={form.amountText} onChange={e=>update('amountText',e.target.value)} aria-describedby={errors.amountText?'amount-error':'amount-help'}/><div className="select-wrap currency-select"><select value={form.currency} onChange={e=>update('currency',e.target.value)} aria-label={t("copy.currency_e070de2")}>{Object.keys(CURRENCY_MINOR_UNITS).map(code=><option key={code}>{code}</option>)}</select><ChevronDown size={13}/></div></div>{errors.amountText?<small className="field-error" id="amount-error">{errors.amountText}</small>:<small className="field-help" id="amount-help">{t("copy.minor_unit_exponent_0146fa2")}{CURRENCY_MINOR_UNITS[form.currency]}{t("copy.values_are_parsed_without_floating_poi_1a41c64")}</small>}</div></section>
-  <section className="panel form-section"><div className="form-section-head"><span className="form-number">{t("copy.02_bcac9d1")}</span><div><span className="eyebrow">{t("copy.permitted_purchases_37d7a92")}</span><h2>{t("copy.allowed_categories_c5b02f8")}</h2><p>{t("copy.choose_the_types_of_purchases_your_age_ec6cb15")}</p></div></div><div className="category-check-grid">{categories.map(c=><label className={`category-check ${form.allowedCategories.includes(c)?'checked':''}`} key={c}><input type="checkbox" checked={form.allowedCategories.includes(c)} onChange={()=>toggle(c)}/><span className="check-box"><Check size={13}/></span>{t('category.'+c)}</label>)}</div>{errors.allowedCategories&&<small className="field-error">{errors.allowedCategories}</small>}</section>
-  <section className="panel form-section"><div className="form-section-head"><span className="form-number">{t("copy.03_3ea6c91")}</span><div><span className="eyebrow">{t("copy.safe_meetups_bfc9d02")}</span><h2>{t("copy.place_time_adcbcee")}</h2><p>{t("copy.keep_in_person_exchanges_visible_publi_2dfb11b")}</p></div></div><label className="toggle-row"><span className="toggle-copy"><b>{t("copy.require_a_public_place_f24cb7d")}</b><small>{t("copy.private_or_isolated_locations_need_rev_7c55e90")}</small></span><input type="checkbox" role="switch" checked={form.meetupRules.requirePublicPlace} onChange={e=>update('meetupRules',{...form.meetupRules,requirePublicPlace:e.target.checked})}/><span className="toggle-ui"/></label><div className="field-grid"><label className="form-field"><span>{t("copy.daytime_start_deaa676")}</span><input type="time" value={form.daytimeStart} onChange={e=>update('daytimeStart',e.target.value)}/></label><label className="form-field"><span>{t("copy.daytime_end_17bbd15")}</span><input type="time" value={form.daytimeEnd} onChange={e=>update('daytimeEnd',e.target.value)}/>{errors.daytimeEnd&&<small className="field-error">{errors.daytimeEnd}</small>}</label><label className="form-field full-field"><span>{t("copy.meetup_timezone_af5c2fb")}</span><select value={form.timeZone} onChange={e=>update('timeZone',e.target.value)}>{zones.map(z=><option key={z}>{z}</option>)}</select></label></div><div className="timezone-note"><CircleHelp size={14}/>{t("copy.time_checks_use_the_selected_local_tim_801ccad")}</div></section>
-  <section className="panel form-section"><div className="form-section-head"><span className="form-number">{t("copy.04_798f861")}</span><div><span className="eyebrow">{t("copy.human_oversight_68b7be0")}</span><h2>{t("copy.guardian_risk_489dcf4")}</h2><p>{t("copy.choose_who_reviews_exceptions_and_the__c19d3be")}</p></div></div><div className="field-grid"><label className="form-field"><span>{t("copy.nominated_guardian_e52b148")}</span><select value={form.guardianId} onChange={e=>update('guardianId',e.target.value)}><option value="guardian-demo">{t("copy.anika_kapoor_demo_72fc266")}</option><option value="guardian-alt-demo">{t("copy.rohan_mehta_demo_f30fd81")}</option></select>{errors.guardianId&&<small className="field-error">{errors.guardianId}</small>}</label><label className="form-field"><span>{t("copy.risk_threshold_f62843b")}<b>{form.riskThreshold}</b></span><input type="range" min="0" max="100" step="1" value={form.riskThreshold} onChange={e=>update('riskThreshold',e.target.value)}/><small>{t("copy.scores_at_or_above_this_threshold_need_be0c752")}</small></label><label className="form-field full-field"><span>{t("copy.mandate_expiry_0f0d653")}</span><input type="date" value={form.expiry} onChange={e=>update('expiry',e.target.value)}/>{errors.expiry&&<small className="field-error">{errors.expiry}</small>}</label></div></section>
- </div><aside className="mandate-summary-column"><section className="mandate-summary panel"><div className="summary-shield"><ShieldCheck size={22}/><span/></div><span className="eyebrow">{t("copy.current_preview_mandate_97cce2e")}</span><h2>{t("copy.built_around_3678876")}<br/>{t("copy.your_boundaries_50fa891")}</h2><div className="summary-limit">{money(parseMinor(form.amountText,form.currency)??0,form.currency)}<small>{t("copy.per_purchase_32baf07")}</small></div><div className="summary-divider"/><div className="summary-rule"><span>{t("copy.categories_6ccb600")}</span><b>{form.allowedCategories.length}{t("copy.selected_1e1c099")}</b></div><div className="summary-rule"><span>{t("copy.public_meetup_86ab35d")}</span><b>{form.meetupRules.requirePublicPlace?t('meetup.required'):t('meetup.notRequired')}</b></div><div className="summary-rule"><span>{t("copy.daytime_0aa4ec6")}</span><b>{form.daytimeStart}{t("copy.copy_0e467cb")}{form.daytimeEnd}</b></div><div className="summary-rule"><span>{t("copy.guardian_6809e87")}</span><b>{form.guardianId==='guardian-demo'?'Anika Kapoor':'Rohan Mehta'}</b></div><div className="summary-rule"><span>{t("copy.expires_a99be3d")}</span><b>{form.expiry?dateLabel(form.expiry):t('mandate.chooseDate')}</b></div><div className="summary-note"><AlertCircle size={15}/><span>{t("copy.editing_this_mandate_never_silently_ch_6e0ab1f")}</span></div><div className="summary-note summary-warning"><CircleHelp size={15}/><span>{t("copy.this_local_form_does_not_call_the_back_c3e6b49")}</span></div></section><div className="mandate-actions"><button type="button" className="button button-outline" onClick={cancel}><Undo2 size={15}/>{t("copy.cancel_changes_bb25b5b")}</button><button type="submit" className="button button-lime"><Save size={15}/>{t("copy.review_save_780a562")}</button></div><p className="local-save-label"><Clock3 size={13}/>{t("copy.demo_changes_stay_in_this_browser_55f3c4e")}</p></aside></form>
- <Modal open={confirm} title={t("copy.save_mandate_preview_7657917")} onClose={()=>setConfirm(false)} actions={<><button className="button button-outline" onClick={()=>setConfirm(false)}>{t("copy.go_back_e84712f")}</button><button className="button button-lime" onClick={save}>{t("copy.save_locally_f75dfce")}<ArrowRight size={15}/></button></>}><div className="confirm-callout"><ShieldCheck size={18}/><p>{t("copy.your_new_rules_will_apply_only_to_futu_ee8b2d1")}</p></div><div className="modal-summary-line"><span>{t("copy.new_single_purchase_limit_ef50183")}</span><b>{money(parseMinor(form.amountText,form.currency)??0,form.currency)}</b></div><div className="modal-summary-line"><span>{t("copy.guardian_6809e87")}</span><b>{form.guardianId==='guardian-demo'?'Anika Kapoor':'Rohan Mehta'}</b></div></Modal>
- </div></PageFrame>
+import { parseMandateMajorAmount } from '../services/mandateDraft.js';
+import { money } from '../services/format.js';
+import './MandatePage.css';
+
+const CATEGORIES = ['electronics', 'home', 'outdoors', 'books', 'fashion', 'other'];
+const ZONES = ['Asia/Kolkata', 'Asia/Dubai', 'Europe/London', 'America/New_York', 'America/Los_Angeles', 'UTC'];
+const EMPTY = Object.freeze({ maxAmountMinor: null, currency: '', allowedCategories: [], meetupRules: { requirePublicPlace: null, daytimeStart: '', daytimeEnd: '', timeZone: '' }, expiresAt: '', guardianId: '', riskThreshold: '' });
+
+function toForm(mandate) {
+  if (!mandate) return { ...EMPTY, meetupRules: { ...EMPTY.meetupRules } };
+  const places = CURRENCY_MINOR_UNITS[mandate.currency] ?? 2;
+  const scale = 10 ** places;
+  const amount = places ? `${Math.floor(mandate.maxAmountMinor / scale)}.${String(mandate.maxAmountMinor % scale).padStart(places, '0')}` : String(mandate.maxAmountMinor);
+  return { ...mandate, amountText: amount, expiry: mandate.expiresAt.slice(0, 10), meetupRules: { ...mandate.meetupRules } };
 }
 
+function errorMessage(error, t) {
+  if (error instanceof ApiRequestError && error.code === 'MANDATE_NOT_FOUND') return '';
+  return error instanceof ApiRequestError ? error.message : t('mandateSetup.requestFailed');
+}
 
+export default function MandatePage() {
+  const { t } = useTranslation();
+  const [token, setToken] = useState('');
+  const [buyerEmail, setBuyerEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [mandate, setMandate] = useState(null);
+  const [relationships, setRelationships] = useState([]);
+  const [form, setForm] = useState(() => toForm(null));
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [success, setSuccess] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [invitation, setInvitation] = useState(null);
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [acceptEmail, setAcceptEmail] = useState('');
+  const [acceptPassword, setAcceptPassword] = useState('');
+  const [relationshipId, setRelationshipId] = useState('');
+  const [acceptBusy, setAcceptBusy] = useState(false);
+  const [guardianMessage, setGuardianMessage] = useState('');
 
+  const eligibleGuardians = useMemo(() => relationships.filter((item) => item.status === 'ACCEPTED' && item.eligible === true), [relationships]);
+
+  async function refresh(tokenValue, { throwOnError = false } = {}) {
+    setLoading(true);
+    setError('');
+    try {
+      const [links, stored] = await Promise.all([
+        getGuardianRelationships(tokenValue),
+        getCurrentMandate(tokenValue).catch((failure) => {
+          if (failure instanceof ApiRequestError && failure.code === 'MANDATE_NOT_FOUND') return null;
+          throw failure;
+        }),
+      ]);
+      setRelationships(links);
+      setMandate(stored);
+      setForm((current) => toForm(stored ?? (current.mandateId ? current : null)));
+      if (!stored) setForm((current) => ({ ...toForm(null), guardianId: current.guardianId }));
+      return stored;
+    } catch (failure) {
+      setError(errorMessage(failure, t));
+      if (throwOnError) throw failure;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleBuyerSignIn(event) {
+    event.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const session = await signInBuyer(buyerEmail.trim(), password);
+      setToken(session.token);
+      setBuyerEmail(session.user.email);
+      setPassword('');
+      await refresh(session.token);
+    } catch (failure) {
+      setError(errorMessage(failure, t));
+      setLoading(false);
+    }
+  }
+
+  async function handleSignOut() {
+    try { await signOut(token); } catch { /* discard the in-memory session either way */ }
+    setToken(''); setMandate(null); setRelationships([]); setForm(toForm(null)); setSuccess(false);
+  }
+
+  function validate() {
+    const next = {};
+    if (!Number.isInteger(CURRENCY_MINOR_UNITS[form.currency])) next.currency = t('mandateSetup.currencyRequired');
+    const maxAmountMinor = parseMandateMajorAmount(form.amountText ?? '', form.currency);
+    if (!maxAmountMinor) next.maxAmountMinor = t('mandateSetup.amountInvalid', { decimals: CURRENCY_MINOR_UNITS[form.currency] ?? 2 });
+    if (!form.allowedCategories.length) next.allowedCategories = t('mandateSetup.categoryRequired');
+    if (typeof form.meetupRules.requirePublicPlace !== 'boolean' || !form.meetupRules.timeZone || !form.meetupRules.daytimeStart || !form.meetupRules.daytimeEnd || form.meetupRules.daytimeStart >= form.meetupRules.daytimeEnd) next.meetupRules = t('mandateSetup.timeInvalid');
+    if (!form.expiry) next.expiry = t('mandateSetup.expiryRequired');
+    else if (new Date(`${form.expiry}T23:59:59Z`).getTime() <= Date.now()) next.expiry = t('mandateSetup.expiryPast');
+    if (!eligibleGuardians.some((item) => item.guardianId === form.guardianId)) next.guardianId = t('mandateSetup.guardianRequired');
+    if (String(form.riskThreshold).trim() === '' || !Number.isInteger(Number(form.riskThreshold)) || Number(form.riskThreshold) < 0 || Number(form.riskThreshold) > 100) next.riskThreshold = t('mandateSetup.riskInvalid');
+    setFieldErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
+  async function handleSave(event) {
+    event.preventDefault();
+    setError(''); setSuccess(false);
+    if (!validate()) return;
+    setSaving(true);
+    const payload = {
+      maxAmountMinor: parseMandateMajorAmount(form.amountText, form.currency),
+      currency: form.currency,
+      allowedCategories: form.allowedCategories,
+      meetupRules: { ...form.meetupRules },
+      expiresAt: `${form.expiry}T23:59:59Z`,
+      guardianId: form.guardianId,
+      riskThreshold: Number(form.riskThreshold),
+    };
+    try {
+      await saveCurrentMandate(token, payload);
+      await refresh(token, { throwOnError: true });
+      setSuccess(true);
+    } catch (failure) {
+      setError(errorMessage(failure, t));
+    } finally { setSaving(false); }
+  }
+
+  async function handleInvite(event) {
+    event.preventDefault(); setInviteBusy(true); setGuardianMessage(''); setError('');
+    if (!inviteEmail.trim()) { setInviteBusy(false); return; }
+    try {
+      const created = await inviteGuardian(token, inviteEmail.trim());
+      setInvitation(created); setInviteEmail(''); setGuardianMessage(t('mandateSetup.invitationCreated'));
+      setRelationships(await getGuardianRelationships(token));
+    } catch (failure) { setError(errorMessage(failure, t)); }
+    finally { setInviteBusy(false); }
+  }
+
+  async function handleAccept(event) {
+    event.preventDefault(); setAcceptBusy(true); setGuardianMessage(''); setError('');
+    if (!acceptEmail.trim() || !acceptPassword || !relationshipId.trim()) { setError(t('mandateSetup.acceptFieldsRequired')); setAcceptBusy(false); return; }
+    let session;
+    try {
+      session = await signInAccount(acceptEmail.trim(), acceptPassword);
+      const accepted = await acceptGuardianInvitation(session.token, relationshipId.trim());
+      setGuardianMessage(t('mandateSetup.invitationAccepted', { buyer: accepted.guardianEmail }));
+      setAcceptPassword(''); setRelationshipId('');
+    } catch (failure) { setError(errorMessage(failure, t)); }
+    finally { if (session?.token) await signOut(session.token).catch(() => {}); setAcceptBusy(false); }
+  }
+
+  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const updateMeetup = (key, value) => setForm((current) => ({ ...current, meetupRules: { ...current.meetupRules, [key]: value } }));
+
+  return <PageFrame className="app-page"><div className="page-shell subpage-shell mandate-page">
+    <header className="subpage-heading"><div><span className="eyebrow"><ShieldCheck size={13}/>{t('mandateSetup.eyebrow')}</span><h1>{t('mandateSetup.title')}<em>{t('mandateSetup.titleAccent')}</em></h1><p>{t('mandateSetup.description')}</p></div>{token && <div className="workspace-chip">{buyerEmail}</div>}</header>
+    {error && <div className="mandate-alert error" role="alert"><AlertTriangle size={16}/>{error}</div>}
+    {success && <div className="mandate-alert success" role="status"><Check size={16}/>{t('mandateSetup.saved')}</div>}
+    {!token ? <section className="panel mandate-auth"><KeyRound size={20}/><div><span className="eyebrow">{t('mandateSetup.buyerSession')}</span><h2>{t('mandateSetup.signInTitle')}</h2><p>{t('mandateSetup.signInBody')}</p></div><form onSubmit={handleBuyerSignIn} className="mandate-auth-form"><label>{t('mandateSetup.email')}<input type="email" autoComplete="username" required maxLength={254} value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)}/></label><label>{t('mandateSetup.password')}<input type="password" autoComplete="current-password" required maxLength={256} value={password} onChange={(event) => setPassword(event.target.value)}/></label><button className="button button-lime" disabled={loading}>{loading ? <LoaderCircle className="spin" size={15}/> : t('mandateSetup.signIn')}<ArrowRight size={14}/></button></form></section> : <>
+      {loading ? <div className="panel mandate-loading" role="status"><LoaderCircle className="spin"/>{t('mandateSetup.loading')}</div> : <>
+        <div className="mandate-toolbar"><span className={`mandate-state ${mandate ? 'is-saved' : ''}`}><i/>{mandate ? t('mandateSetup.persistedState') : t('mandateSetup.emptyState')}</span><div><button type="button" className="button button-outline button-small" onClick={() => refresh(token)}><RefreshCw size={14}/>{t('mandateSetup.refresh')}</button><button type="button" className="button button-outline button-small" onClick={handleSignOut}><LogOut size={14}/>{t('mandateSetup.signOut')}</button></div></div>
+        <form className="mandate-editor" onSubmit={handleSave} noValidate>
+          <section className="panel mandate-form-panel"><header><span className="form-number">01</span><div><span className="eyebrow">{t('mandateSetup.spending')}</span><h2>{t('mandateSetup.limitTitle')}</h2><p>{t('mandateSetup.limitBody')}</p></div></header><div className="mandate-field-grid"><label className="mandate-field wide"><span>{t('mandateSetup.amountLabel')}</span><div className="amount-entry"><input aria-label={t('mandateSetup.amountLabel')} inputMode="decimal" value={form.amountText ?? ''} placeholder={t('mandateSetup.amountPlaceholder')} onChange={(event) => set('amountText', event.target.value)}/><select value={form.currency} onChange={(event) => set('currency', event.target.value)} aria-label={t('mandateSetup.currency')}><option value="">{t('mandateSetup.chooseCurrency')}</option>{Object.keys(CURRENCY_MINOR_UNITS).map((currency) => <option key={currency} value={currency}>{currency}</option>)}</select></div>{fieldErrors.currency && <small className="field-error">{fieldErrors.currency}</small>}{fieldErrors.maxAmountMinor ? <small className="field-error">{fieldErrors.maxAmountMinor}</small> : <small>{t('mandateSetup.amountHelp', { decimals: CURRENCY_MINOR_UNITS[form.currency] ?? 2 })}</small>}</label></div></section>
+          <section className="panel mandate-form-panel"><header><span className="form-number">02</span><div><span className="eyebrow">{t('mandateSetup.purchases')}</span><h2>{t('mandateSetup.categoriesTitle')}</h2><p>{t('mandateSetup.categoriesBody')}</p></div></header><div className="mandate-categories">{CATEGORIES.map((category) => <label key={category}><input type="checkbox" checked={form.allowedCategories.includes(category)} onChange={(event) => set('allowedCategories', event.target.checked ? [...form.allowedCategories, category] : form.allowedCategories.filter((item) => item !== category))}/><span><Check size={13}/></span>{t(`mandateSetup.category.${category}`)}</label>)}</div>{fieldErrors.allowedCategories && <small className="field-error">{fieldErrors.allowedCategories}</small>}</section>
+          <section className="panel mandate-form-panel"><header><span className="form-number">03</span><div><span className="eyebrow">{t('mandateSetup.meetups')}</span><h2>{t('mandateSetup.meetupTitle')}</h2><p>{t('mandateSetup.meetupBody')}</p></div></header><label className="mandate-field mandate-place-select"><span>{t('mandateSetup.publicPlace')}</span><select value={form.meetupRules.requirePublicPlace === null ? '' : String(form.meetupRules.requirePublicPlace)} onChange={(event) => updateMeetup('requirePublicPlace', event.target.value === '' ? null : event.target.value === 'true')}><option value="">{t('mandateSetup.chooseRequirement')}</option><option value="true">{t('mandateSetup.required')}</option><option value="false">{t('mandateSetup.notRequired')}</option></select><small>{t('mandateSetup.publicPlaceHelp')}</small></label><div className="mandate-field-grid"><label className="mandate-field"><span>{t('mandateSetup.dayStart')}</span><input type="time" value={form.meetupRules.daytimeStart} onChange={(event) => updateMeetup('daytimeStart', event.target.value)}/></label><label className="mandate-field"><span>{t('mandateSetup.dayEnd')}</span><input type="time" value={form.meetupRules.daytimeEnd} onChange={(event) => updateMeetup('daytimeEnd', event.target.value)}/></label><label className="mandate-field wide"><span>{t('mandateSetup.timeZone')}</span><select value={form.meetupRules.timeZone} onChange={(event) => updateMeetup('timeZone', event.target.value)}><option value="">{t('mandateSetup.chooseTimeZone')}</option>{ZONES.map((zone) => <option key={zone}>{zone}</option>)}</select></label></div>{fieldErrors.meetupRules && <small className="field-error">{fieldErrors.meetupRules}</small>}</section>
+          <section className="panel mandate-form-panel"><header><span className="form-number">04</span><div><span className="eyebrow">{t('mandateSetup.oversight')}</span><h2>{t('mandateSetup.guardianTitle')}</h2><p>{t('mandateSetup.guardianBody')}</p></div></header>
+            {eligibleGuardians.length ? <label className="mandate-field"><span>{t('mandateSetup.selectGuardian')}</span><select value={form.guardianId} onChange={(event) => set('guardianId', event.target.value)}><option value="">{t('mandateSetup.chooseGuardian')}</option>{eligibleGuardians.map((guardian) => <option key={guardian.relationshipId} value={guardian.guardianId}>{guardian.guardianEmail}</option>)}</select>{fieldErrors.guardianId && <small className="field-error">{fieldErrors.guardianId}</small>}</label> : <div className="mandate-empty-guardian"><AlertTriangle size={17}/><div><b>{t('mandateSetup.noGuardian')}</b><p>{t('mandateSetup.noGuardianBody')}</p></div></div>}
+            <div className="guardian-action"><label className="mandate-field"><span>{t('mandateSetup.inviteLabel')}</span><input type="email" maxLength={254} value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder={t('mandateSetup.invitePlaceholder')}/></label><button type="button" onClick={handleInvite} className="button button-outline" disabled={inviteBusy || !inviteEmail.trim()}>{inviteBusy ? t('mandateSetup.sending') : <><UserPlus size={14}/>{t('mandateSetup.invite')}</>}</button></div>
+            {invitation && <p className="mandate-help">{t('mandateSetup.shareRelationshipId')} <code>{invitation.relationshipId}</code></p>}
+            <details className="guardian-accept"><summary>{t('mandateSetup.acceptTitle')}</summary><p>{t('mandateSetup.acceptBody')}</p><div><div className="guardian-accept-grid"><label className="mandate-field"><span>{t('mandateSetup.relationshipId')}</span><input value={relationshipId} onChange={(event) => setRelationshipId(event.target.value)}/></label><label className="mandate-field"><span>{t('mandateSetup.email')}</span><input type="email" autoComplete="username" value={acceptEmail} onChange={(event) => setAcceptEmail(event.target.value)}/></label><label className="mandate-field"><span>{t('mandateSetup.password')}</span><input type="password" autoComplete="current-password" value={acceptPassword} onChange={(event) => setAcceptPassword(event.target.value)}/></label></div><button type="button" onClick={handleAccept} className="button button-outline" disabled={acceptBusy}>{acceptBusy ? t('mandateSetup.accepting') : t('mandateSetup.acceptButton')}</button></div></details>
+            {guardianMessage && <p className="mandate-help" role="status">{guardianMessage}</p>}
+            <div className="mandate-field-grid mandate-lower-fields"><label className="mandate-field"><span>{t('mandateSetup.riskThreshold')}</span><input type="number" min="0" max="100" step="1" value={form.riskThreshold} placeholder="0–100" onChange={(event) => set('riskThreshold', event.target.value)}/><small>{t('mandateSetup.riskHelp')}</small>{fieldErrors.riskThreshold && <small className="field-error">{fieldErrors.riskThreshold}</small>}</label><label className="mandate-field"><span>{t('mandateSetup.expiry')}</span><input type="date" value={form.expiry ?? ''} onChange={(event) => set('expiry', event.target.value)}/>{fieldErrors.expiry && <small className="field-error">{fieldErrors.expiry}</small>}</label></div>
+          </section>
+          <aside className="panel mandate-summary-card"><span className="eyebrow">{t('mandateSetup.summary')}</span><h2>{t('mandateSetup.summaryTitle')}</h2><div className="mandate-summary-limit">{form.amountText && parseMandateMajorAmount(form.amountText, form.currency) ? money(parseMandateMajorAmount(form.amountText, form.currency), form.currency) : '—'}<small>{t('mandateSetup.perPurchase')}</small></div><div className="mandate-summary-row"><span>{t('mandateSetup.categoriesTitle')}</span><b>{form.allowedCategories.length ? form.allowedCategories.join(', ') : '—'}</b></div><div className="mandate-summary-row"><span>{t('mandateSetup.publicPlace')}</span><b>{typeof form.meetupRules.requirePublicPlace === 'boolean' ? t(form.meetupRules.requirePublicPlace ? 'mandateSetup.required' : 'mandateSetup.notRequired') : '—'}</b></div><div className="mandate-summary-row"><span>{t('mandateSetup.dayStart')}–{t('mandateSetup.dayEnd')}</span><b>{form.meetupRules.daytimeStart && form.meetupRules.daytimeEnd ? `${form.meetupRules.daytimeStart}–${form.meetupRules.daytimeEnd}` : '—'}</b></div><div className="mandate-summary-row"><span>{t('mandateSetup.timeZone')}</span><b>{form.meetupRules.timeZone || '—'}</b></div><div className="mandate-summary-row"><span>{t('mandateSetup.selectGuardian')}</span><b>{eligibleGuardians.find((item) => item.guardianId === form.guardianId)?.guardianEmail ?? '—'}</b></div><div className="mandate-summary-row"><span>{t('mandateSetup.riskThreshold')}</span><b>{form.riskThreshold === '' ? '—' : form.riskThreshold}</b></div><div className="mandate-summary-row"><span>{t('mandateSetup.expiry')}</span><b>{form.expiry || '—'}</b></div><p>{t('mandateSetup.summaryNote')}</p><button type="submit" className="button button-lime" disabled={saving || loading || !eligibleGuardians.length}>{saving ? <LoaderCircle className="spin" size={15}/> : <Check size={15}/ >}{mandate ? t('mandateSetup.saveUpdate') : t('mandateSetup.createMandate')}</button></aside>
+        </form>
+      </>}
+    </>}
+  </div></PageFrame>;
+}

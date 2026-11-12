@@ -18,6 +18,15 @@ export function createMandateService(repositories) {
       throw new ApiError(400, 'INVALID_MANDATE', validation.errors.join(' '));
     }
 
+    if (mandate.guardianId === principal.userId) {
+      throw new ApiError(409, 'GUARDIAN_NOT_ELIGIBLE', 'Choose an accepted guardian relationship for this mandate.');
+    }
+    const relationship = await repositories.guardianRelationships.findAccepted(principal.userId, mandate.guardianId);
+    const guardian = await repositories.users.findByUserId(mandate.guardianId);
+    if (!relationship || guardian?.role !== 'guardian' || guardian?.accountStatus !== 'ACTIVE') {
+      throw new ApiError(409, 'GUARDIAN_NOT_ELIGIBLE', 'The selected guardian must have an accepted relationship and an active guardian account.');
+    }
+
     await repositories.mandates.insert({
       mandateId: mandate.mandateId,
       buyerId: principal.userId,
