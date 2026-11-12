@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, ArrowRight, Check, KeyRound, LoaderCircle, LogOut, RefreshCw, ShieldCheck, UserPlus } from 'lucide-react';
 import PageFrame from '../components/PageFrame.jsx';
-import { ApiRequestError, acceptGuardianInvitation, getCurrentMandate, getGuardianRelationships, inviteGuardian, saveCurrentMandate, signInAccount, signInBuyer, signOut } from '../services/api.js';
+import { ApiRequestError, acceptGuardianInvitation, getCurrentMandate, getGuardianRelationships, inviteGuardian, registerBuyerAccount, saveCurrentMandate, signInAccount, signInBuyer, signOut } from '../services/api.js';
 import { CURRENCY_MINOR_UNITS } from '../data/currencyMeta.js';
 import { parseMandateMajorAmount } from '../services/mandateDraft.js';
 import { money } from '../services/format.js';
@@ -30,6 +30,7 @@ export default function MandatePage() {
   const [token, setToken] = useState('');
   const [buyerEmail, setBuyerEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [creatingAccount, setCreatingAccount] = useState(false);
   const [mandate, setMandate] = useState(null);
   const [relationships, setRelationships] = useState([]);
   const [form, setForm] = useState(() => toForm(null));
@@ -78,7 +79,12 @@ export default function MandatePage() {
     setLoading(true);
     setError('');
     try {
-      const session = await signInBuyer(buyerEmail.trim(), password);
+      const session = creatingAccount
+        ? await registerBuyerAccount(buyerEmail.trim(), password)
+        : await signInBuyer(buyerEmail.trim(), password);
+      if (session?.user?.role !== 'buyer' || typeof session?.token !== 'string') {
+        throw new ApiRequestError({ status: 403, code: 'BUYER_ACCOUNT_REQUIRED', message: t('mandateSetup.buyerAccountRequired') });
+      }
       setToken(session.token);
       setBuyerEmail(session.user.email);
       setPassword('');
@@ -163,7 +169,7 @@ export default function MandatePage() {
     <header className="subpage-heading"><div><span className="eyebrow"><ShieldCheck size={13}/>{t('mandateSetup.eyebrow')}</span><h1>{t('mandateSetup.title')}<em>{t('mandateSetup.titleAccent')}</em></h1><p>{t('mandateSetup.description')}</p></div>{token && <div className="workspace-chip">{buyerEmail}</div>}</header>
     {error && <div className="mandate-alert error" role="alert"><AlertTriangle size={16}/>{error}</div>}
     {success && <div className="mandate-alert success" role="status"><Check size={16}/>{t('mandateSetup.saved')}</div>}
-    {!token ? <section className="panel mandate-auth"><KeyRound size={20}/><div><span className="eyebrow">{t('mandateSetup.buyerSession')}</span><h2>{t('mandateSetup.signInTitle')}</h2><p>{t('mandateSetup.signInBody')}</p></div><form onSubmit={handleBuyerSignIn} className="mandate-auth-form"><label>{t('mandateSetup.email')}<input type="email" autoComplete="username" required maxLength={254} value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)}/></label><label>{t('mandateSetup.password')}<input type="password" autoComplete="current-password" required maxLength={256} value={password} onChange={(event) => setPassword(event.target.value)}/></label><button className="button button-lime" disabled={loading}>{loading ? <LoaderCircle className="spin" size={15}/> : t('mandateSetup.signIn')}<ArrowRight size={14}/></button></form></section> : <>
+    {!token ? <section className="panel mandate-auth"><KeyRound size={20}/><div><span className="eyebrow">{t('mandateSetup.buyerSession')}</span><h2>{creatingAccount ? t('mandateSetup.registerTitle') : t('mandateSetup.signInTitle')}</h2><p>{creatingAccount ? t('mandateSetup.registerBody') : t('mandateSetup.signInBody')}</p></div><form onSubmit={handleBuyerSignIn} className="mandate-auth-form"><label>{t('mandateSetup.email')}<input type="email" autoComplete="username" required maxLength={254} value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)}/></label><label>{t('mandateSetup.password')}<input type="password" autoComplete={creatingAccount ? 'new-password' : 'current-password'} required minLength={creatingAccount ? 12 : undefined} maxLength={creatingAccount ? 200 : 256} value={password} onChange={(event) => setPassword(event.target.value)}/>{creatingAccount && <small>{t('mandateSetup.passwordRequirement')}</small>}</label><button className="button button-lime" disabled={loading}>{loading ? <LoaderCircle className="spin" size={15}/> : creatingAccount ? t('mandateSetup.createBuyerAccount') : t('mandateSetup.signIn')}<ArrowRight size={14}/></button></form><button type="button" className="button button-outline mandate-auth-toggle" onClick={() => { setCreatingAccount((current) => !current); setError(''); }} disabled={loading}>{creatingAccount ? t('mandateSetup.haveAccount') : t('mandateSetup.needAccount')}</button></section> : <>
       {loading ? <div className="panel mandate-loading" role="status"><LoaderCircle className="spin"/>{t('mandateSetup.loading')}</div> : <>
         <div className="mandate-toolbar"><span className={`mandate-state ${mandate ? 'is-saved' : ''}`}><i/>{mandate ? t('mandateSetup.persistedState') : t('mandateSetup.emptyState')}</span><div><button type="button" className="button button-outline button-small" onClick={() => refresh(token)}><RefreshCw size={14}/>{t('mandateSetup.refresh')}</button><button type="button" className="button button-outline button-small" onClick={handleSignOut}><LogOut size={14}/>{t('mandateSetup.signOut')}</button></div></div>
         <form className="mandate-editor" onSubmit={handleSave} noValidate>
