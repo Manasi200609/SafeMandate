@@ -115,7 +115,8 @@ export async function requestPayPalSdkOrder({ transactionId, token, expectedVers
   const response = await createOrder(transactionId, token, expectedVersion);
   const operation = response?.operation;
   if (operation?.kind !== 'CREATE_ORDER' || operation.status !== 'COMPLETED'
-    || operation.providerStatus !== 'CREATED' || typeof operation.providerResourceId !== 'string' || !operation.providerResourceId) {
+    || !['CREATED', 'PAYER_ACTION_REQUIRED'].includes(operation.providerStatus)
+    || typeof operation.providerResourceId !== 'string' || !operation.providerResourceId) {
     onUnresolved(operation ?? null);
     throw new PayPalSdkError('PAYMENT_OUTCOME_UNKNOWN', 'PayPal order result is unresolved. Reconcile before retrying.');
   }
