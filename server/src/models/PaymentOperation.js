@@ -13,6 +13,7 @@ const paymentOperationSchema = new mongoose.Schema({
   providerTimestamp: { type: String, default: null },
   approvalUrl: { type: String, default: null },
   providerErrorCode: { type: String, default: null },
+  providerErrorField: { type: String, default: null },
   createdAt: { type: String, required: true },
   updatedAt: { type: String, required: true },
 }, { timestamps: false, versionKey: false });

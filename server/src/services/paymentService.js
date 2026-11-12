@@ -35,6 +35,7 @@ function safeOperation(operation) {
     // Provider error codes are normalized enums; raw provider messages and
     // response bodies remain private so payment status is safe to expose.
     providerErrorCode: /^[A-Z0-9_]{1,64}$/.test(operation.providerErrorCode ?? '') ? operation.providerErrorCode : null,
+    providerErrorField: typeof operation.providerErrorField === 'string' && /^\/?[A-Za-z0-9_~/-]{1,160}$/.test(operation.providerErrorField) ? operation.providerErrorField : null,
     approvalUrl: operation.approvalUrl,
     amountMinor: operation.amountMinor,
     currency: operation.currency,
@@ -173,6 +174,7 @@ export function createPaymentService({ repositories, transactionService, paypalA
       status: unknown ? 'UNKNOWN' : 'FAILED',
       providerResourceId: resourceId,
       providerErrorCode: /^[A-Z0-9_]{1,64}$/.test(error?.issue ?? '') ? error.issue : 'PROVIDER_ERROR',
+      providerErrorField: typeof error?.field === 'string' && /^\/?[A-Za-z0-9_~/-]{1,160}$/.test(error.field) ? error.field : null,
     });
     if (unknown) throw new ApiError(202, 'PAYMENT_OUTCOME_UNKNOWN', 'PayPal may have processed this operation. Reconcile before retrying.');
     if (error instanceof PayPalApiError) throw new ApiError(502, 'PAYPAL_OPERATION_FAILED', 'PayPal Sandbox could not complete the payment operation.');

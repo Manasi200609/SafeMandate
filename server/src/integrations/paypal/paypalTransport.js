@@ -1,12 +1,13 @@
 const SANDBOX_BASE_URL = 'https://api-m.sandbox.paypal.com';
 
 export class PayPalApiError extends Error {
-  constructor({ status, issue = 'PROVIDER_ERROR', debugId = null } = {}) {
+  constructor({ status, issue = 'PROVIDER_ERROR', field = null, debugId = null } = {}) {
     super(`PayPal Sandbox request failed (${status ?? 'network'}).`);
     this.name = 'PayPalApiError';
     this.code = 'PAYPAL_PROVIDER_ERROR';
     this.status = Number.isInteger(status) ? status : null;
     this.issue = /^[A-Z0-9_]{1,64}$/.test(issue) ? issue : 'PROVIDER_ERROR';
+    this.field = typeof field === 'string' && /^\/?[A-Za-z0-9_~/-]{1,160}$/.test(field) ? field : null;
     this.debugId = typeof debugId === 'string' && /^[A-Za-z0-9-]{1,80}$/.test(debugId) ? debugId : null;
   }
 }
@@ -93,6 +94,7 @@ export function createPayPalTransport({ clientId, clientSecret, baseUrl = SANDBO
         // PayPal's top-level name is often just INVALID_REQUEST; details[].issue
         // contains the actionable schema/business validation code.
         issue: String(data?.details?.find((detail) => typeof detail?.issue === 'string')?.issue ?? data?.error ?? data?.name ?? 'PROVIDER_ERROR').toUpperCase().replaceAll('-', '_'),
+        field: data?.details?.find((detail) => typeof detail?.field === 'string')?.field ?? null,
         debugId: response.headers.get('paypal-debug-id'),
       });
     }
