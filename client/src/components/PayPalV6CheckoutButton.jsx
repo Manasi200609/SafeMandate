@@ -11,6 +11,7 @@ const messagesByState = {
   'sdk-missing': 'paypalV6.notConfigured',
   'sdk-error': 'paypalV6.unavailable',
   ineligible: 'paypalV6.ineligible',
+  'eligibility-warning': 'paypalV6.eligibilityWarning',
   starting: 'paypalV6.starting',
   authorizing: 'paypalV6.verifying',
   fallback: 'paypalV6.popupFallback',
@@ -50,7 +51,6 @@ export default function PayPalV6CheckoutButton({ transaction, token, onRefresh, 
         if (status !== 'ready') { setState(status); return; }
         const allowed = await findPayPalEligibility(sdk, latestTransaction);
         if (!active) return;
-        if (!allowed) { setState('ineligible'); return; }
         const paymentSession = createPayPalAuthorizationSession(sdk, {
           onApprove: (data = {}) => {
             if (approvalInFlight.current) return approvalInFlight.current;
@@ -123,7 +123,9 @@ export default function PayPalV6CheckoutButton({ transaction, token, onRefresh, 
         setSession(paymentSession);
         setEligible(true);
         setCanCheckout(true);
-        setState('ready');
+        // SDK eligibility is advisory. The authenticated backend remains authoritative
+        // and validates the persisted transaction before it creates any PayPal order.
+        setState(allowed ? 'ready' : 'eligibility-warning');
       }).catch((error) => {
         if (!active) return;
         setEligible(false); setCanCheckout(false);
@@ -203,7 +205,7 @@ export default function PayPalV6CheckoutButton({ transaction, token, onRefresh, 
     } catch { setState('unresolved'); setCanCheckout(false); }
     finally { setReconciling(false); }
   }
-  const showButton = eligible && canCheckout && ['ready', 'cancelled', 'error'].includes(state);
+  const showButton = eligible && canCheckout && ['ready', 'cancelled', 'error', 'eligibility-warning'].includes(state);
   return <div className={`paypal-v6-control${busy ? ' is-busy' : ''}`}>
     <div className="paypal-v6-amount">{money(transaction.amountMinor, transaction.currency)}</div>
     {showButton && <paypal-button ref={buttonRef} type="checkout" class="paypal-gold" aria-label={t('paypalV6.buttonLabel')} />}

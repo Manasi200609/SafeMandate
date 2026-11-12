@@ -943,6 +943,7 @@
   "paypalV6.notConfigured": "या फ्रंटएंडसाठी PayPal Sandbox कॉन्फिगर केलेले नाही. Vercel मध्ये सार्वजनिक VITE_PAYPAL_CLIENT_ID सेट करा.",
   "paypalV6.unavailable": "PayPal चेकआउट लोड झाले नाही. पृष्ठ रीफ्रेश करा किंवा नंतर प्रयत्न करा.",
   "paypalV6.ineligible": "या व्यवहार, रक्कम किंवा चलनासाठी PayPal उपलब्ध नाही.",
+  "paypalV6.eligibilityWarning": "PayPal या ब्राउझरमध्ये उपलब्धतेची पुष्टी करू शकला नाही. बॅकएंडने व्यवहार तयार असल्याचे दाखवल्यासच पुढे जा; checkout उपलब्धता PayPal तपासेल.",
   "paypalV6.starting": "PayPal चेकआउट उघडत आहे…",
   "paypalV6.popupFallback": "पॉपअप उघडू शकले नाही. PayPal चेकआउट ओव्हरले सुरू करत आहे…",
   "paypalV6.verifying": "PayPal ने ऑर्डर मंजूर केली. Safe Mandate प्राधिकरणाची पडताळणी करत आहे…",

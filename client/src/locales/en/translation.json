@@ -943,6 +943,7 @@
   "paypalV6.notConfigured": "PayPal Sandbox is not configured for this frontend. Set the public VITE_PAYPAL_CLIENT_ID in Vercel.",
   "paypalV6.unavailable": "PayPal checkout could not be loaded. Refresh the page or try again later.",
   "paypalV6.ineligible": "PayPal is not available for this transaction, amount, or currency.",
+  "paypalV6.eligibilityWarning": "PayPal could not confirm availability here. Continue only if the backend marks this transaction ready; PayPal will verify checkout availability.",
   "paypalV6.starting": "Opening PayPal checkout…",
   "paypalV6.popupFallback": "The popup could not open. Switching to the PayPal checkout overlay…",
   "paypalV6.verifying": "PayPal approved the order. Safe Mandate is verifying authorization…",
