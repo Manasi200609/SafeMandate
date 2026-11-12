@@ -94,6 +94,28 @@ test('login, session lookup, logout, and bad credentials behave safely', async (
   }
 });
 
+test('seller choices are buyer-only and expose only active other sellers public fields', async () => {
+  const { repositories, baseUrl, close } = await context();
+  try {
+    const buyer = await request(baseUrl, 'POST', '/api/auth/register', { body: BUYER });
+    const seller = await request(baseUrl, 'POST', '/api/auth/register', { body: SELLER });
+    await repositories.users.insert({
+      userId: 'user_suspended_seller', email: 'suspended@example.test', displayName: 'Suspended seller',
+      role: 'seller', accountStatus: 'SUSPENDED', passwordHash: 'private-hash',
+    });
+    const choices = await request(baseUrl, 'GET', '/api/transactions/sellers', { token: buyer.body.token });
+    assert.equal(choices.status, 200);
+    assert.deepEqual(choices.body.sellers, [{ sellerId: seller.body.user.userId, displayName: seller.body.user.displayName }]);
+    assert.equal(JSON.stringify(choices.body).includes('email'), false);
+    assert.equal(JSON.stringify(choices.body).includes('passwordHash'), false);
+    assert.equal(choices.headers.get('cache-control'), 'no-store');
+    assert.equal((await request(baseUrl, 'GET', '/api/transactions/sellers')).status, 401);
+    assert.equal((await request(baseUrl, 'GET', '/api/transactions/sellers', { token: seller.body.token })).status, 403);
+  } finally {
+    await close();
+  }
+});
+
 test('middleware rejects expired sessions before MongoDB TTL cleanup occurs', async () => {
   const token = 'a'.repeat(43);
   const tokenHash = hashSessionToken(token);

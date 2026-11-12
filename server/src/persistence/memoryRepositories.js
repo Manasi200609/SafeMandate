@@ -39,6 +39,12 @@ export function createMemoryRepositories() {
       async findByUserId(userId) {
         return users.has(userId) ? clone(users.get(userId)) : null;
       },
+      async listActiveSellers({ excludeUserId } = {}) {
+        return [...users.values()]
+          .filter((user) => user.role === 'seller' && user.accountStatus === 'ACTIVE' && user.userId !== excludeUserId)
+          .map(({ userId, displayName }) => ({ userId, displayName }))
+          .sort((left, right) => left.displayName.localeCompare(right.displayName));
+      },
       async setRole(userId, role) {
         const user = users.get(userId);
         if (!user || user.accountStatus !== 'ACTIVE') return false;

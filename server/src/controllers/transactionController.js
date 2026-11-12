@@ -2,6 +2,11 @@ import { requireTransactionId } from './mandateStoreController.js';
 
 export function createTransactionController(transactionService) {
   return Object.freeze({
+    async sellerChoices(req, res) {
+      const sellers = await transactionService.listSellerChoices({ principal: req.principal });
+      res.set('Cache-Control', 'no-store');
+      return res.status(200).json({ sellers });
+    },
     async create(req, res) {
       const transaction = await transactionService.createTransaction({ principal: req.principal, body: req.body });
       res.set('Cache-Control', 'no-store');

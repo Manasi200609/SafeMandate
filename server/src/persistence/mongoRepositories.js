@@ -54,6 +54,13 @@ export function createMongoRepositories() {
       async findByUserId(userId) {
         return mapUser(await User.findOne({ userId }).lean());
       },
+      async listActiveSellers({ excludeUserId } = {}) {
+        const records = await User.find({ role: 'seller', accountStatus: 'ACTIVE', ...(excludeUserId ? { userId: { $ne: excludeUserId } } : {}) })
+          .select('userId displayName -_id')
+          .sort({ displayName: 1 })
+          .lean();
+        return records.map(({ userId, displayName }) => ({ userId, displayName }));
+      },
       async setRole(userId, role) {
         const result = await User.updateOne({ userId, accountStatus: 'ACTIVE' }, { $set: { role } });
         return result.modifiedCount === 1;

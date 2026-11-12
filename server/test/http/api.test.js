@@ -37,6 +37,7 @@ test('Express app mounts the required API routes and centralized handlers', () =
     'GET /api/guardian-relationships',
     'POST /api/guardian-relationships/:relationshipId/accept',
     'POST /api/transactions',
+    'GET /api/transactions/sellers',
     'GET /api/transactions',
     'GET /api/transactions/:transactionId',
     'GET /api/transactions/:transactionId/audit',

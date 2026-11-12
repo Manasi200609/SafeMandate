@@ -71,6 +71,19 @@ export async function getTransactions(token, { signal } = {}) {
   return result.transactions;
 }
 
+export async function getSellerChoices(token, { signal } = {}) {
+  const result = await requestJson('/api/transactions/sellers', { token, signal });
+  return result.sellers;
+}
+
+export async function createTransaction(token, sellerId, proposal) {
+  return requestJson('/api/transactions', { method: 'POST', token, body: { sellerId, proposal } });
+}
+
+export async function evaluateTransaction(transactionId, token) {
+  return requestJson(`/api/transactions/${encodeURIComponent(transactionId)}/evaluate`, { method: 'POST', token });
+}
+
 export async function getTransaction(transactionId, token, { signal } = {}) {
   const result = await requestJson(`/api/transactions/${encodeURIComponent(transactionId)}`, { token, signal });
   return result.transaction;

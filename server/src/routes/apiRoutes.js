@@ -62,6 +62,7 @@ export function createApiRoutes({ repositories, config = getConfig(), paypalAdap
   router.post('/guardian-relationships/:relationshipId/accept', authenticate, guardianController.accept);
 
   router.post('/transactions', authenticate, buyerOnly, transactionController.create);
+  router.get('/transactions/sellers', authenticate, buyerOnly, transactionController.sellerChoices);
   router.get('/transactions', authenticate, participantOnly, transactionController.list);
   router.get('/transactions/:transactionId', authenticate, participantOnly, transactionController.detail);
   router.get('/transactions/:transactionId/audit', authenticate, participantOnly, transactionController.audit);

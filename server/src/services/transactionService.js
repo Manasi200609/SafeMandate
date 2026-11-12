@@ -239,6 +239,14 @@ export function createTransactionService(repositories, { assertGuardianAccepted 
     return toTransactionView(record);
   }
 
+  async function listSellerChoices({ principal } = {}) {
+    if (principal?.role !== 'buyer') {
+      throw new ApiError(403, 'ROLE_NOT_PERMITTED', 'Only an authenticated buyer may view seller choices.');
+    }
+    const sellers = await repositories.users.listActiveSellers({ excludeUserId: principal.userId });
+    return sellers.map(({ userId, displayName }) => ({ sellerId: userId, displayName }));
+  }
+
   async function evaluateTransaction({ principal, transactionId } = {}) {
     const { record, aggregate } = await load(transactionId);
     if (record.buyerId !== principal?.userId) {
@@ -379,6 +387,7 @@ export function createTransactionService(repositories, { assertGuardianAccepted 
 
   return Object.freeze({
     createTransaction,
+    listSellerChoices,
     evaluateTransaction,
     guardianDecision,
     getPaymentContext,
