@@ -60,7 +60,7 @@ export function transitionTransaction(transaction, event, context = {}) {
     if (!['buyer','seller'].includes(e.party)) fail('Handoff party must be buyer or seller.');
   }
   if (e.type === 'GUARDIAN_DECISION' && (actor.role !== 'guardian' || actor.id !== r.mandate.guardianId)) fail('Only the nominated guardian may decide this exception.', 'INVALID_ACTOR');
-  const roleByEvent = { POLICY_EVALUATED:['agent','system'], GUARDIAN_APPROVAL_READY:['system'], PAYMENT_ORDER_CREATED:['system'], PAYMENT_AUTHORIZED:['paypal'], MEETUP_STARTED:['system'], CAPTURE_REQUESTED:['system'], PAYPAL_CAPTURE_CONFIRMED:['paypal'], MISSED_CHECK_IN:['system'], VOID_REQUESTED:['system'], PAYPAL_VOID_CONFIRMED:['paypal'], EXPIRE:['system'], BLOCK:['system'] };
+  const roleByEvent = { POLICY_EVALUATED:['agent','system'], GUARDIAN_APPROVAL_READY:['system'], PAYMENT_ORDER_CREATED:['system'], PAYMENT_AUTHORIZED:['paypal'], MEETUP_STARTED:['system'], CAPTURE_REQUESTED:['system'], PAYPAL_CAPTURE_CONFIRMED:['paypal'], PAYMENT_RECONCILED:['paypal'], MISSED_CHECK_IN:['system'], VOID_REQUESTED:['system'], PAYPAL_VOID_CONFIRMED:['paypal'], EXPIRE:['system'], BLOCK:['system'] };
   if (roleByEvent[e.type] && !roleByEvent[e.type].includes(actor.role)) fail(`Actor role is not permitted for ${e.type}.`, 'INVALID_ACTOR');
   if (!STATES.includes(r.state)) fail('Internal transaction state is invalid.', 'INVALID_STATE');
   const oldState = r.state;
@@ -82,11 +82,12 @@ export function transitionTransaction(transaction, event, context = {}) {
     }
     case 'GUARDIAN_DECISION': {
       if (oldState !== 'NEEDS_GUARDIAN' || !policyEvidence || policyEvidence.decision !== 'NEEDS_GUARDIAN') fail('A valid policy exception is required before guardian review.');
+      if (!isMandateActive(r.mandate, now)) fail('An expired mandate cannot receive guardian approval.', 'MANDATE_EXPIRED');
       if (approval) fail('Guardian decision was already recorded.', 'DUPLICATE_APPROVAL');
       if (e.transactionId !== r.transactionId || e.proposalId !== r.proposal.proposalId || e.mandateId !== r.mandate.mandateId || e.proposalVersion !== r.proposalVersion || e.proposalFingerprint !== r.proposalFingerprint) fail('Guardian decision does not bind to the current transaction, mandate, and proposal version.', 'APPROVAL_BINDING_MISMATCH');
       if (!['approve','reject'].includes(e.decision)) fail('Guardian decision must be approve or reject.');
       requireReason();
-      approval = deepFreeze({ transactionId:r.transactionId, proposalId:r.proposal.proposalId, mandateId:r.mandate.mandateId, proposalVersion:r.proposalVersion, proposalFingerprint:r.proposalFingerprint, guardianId:actor.id, decision:e.decision, timestamp:now, originalExceptionReasons:[...policyEvidence.reasonCodes], reason });
+      approval = deepFreeze({ transactionId:r.transactionId, proposalId:r.proposal.proposalId, mandateId:r.mandate.mandateId, proposalVersion:r.proposalVersion, proposalFingerprint:r.proposalFingerprint, guardianId:actor.id, decision:e.decision, timestamp:now, expiresAt:r.mandate.expiresAt, revokedAt:null, originalExceptionReasons:[...policyEvidence.reasonCodes], reason });
       metadata = { guardianApproval:approval };
       move(e.decision === 'approve' ? 'GUARDIAN_APPROVED' : 'BLOCKED');
       break;
@@ -125,11 +126,17 @@ export function transitionTransaction(transaction, event, context = {}) {
     case 'PAYPAL_CAPTURE_CONFIRMED':
       if (oldState!=='CAPTURE_PENDING'||!provider.authorizationId) fail('Capture confirmation requires a pending capture and authorization.');
       requireString(e.captureId,'captureId'); move('CAPTURED'); explain('Payment provider capture was reported by the trusted adapter.'); provider=deepFreeze({...provider,captureId:e.captureId}); metadata={captureId:e.captureId}; break;
+    case 'PAYMENT_RECONCILED':
+      requireString(e.operationId, 'operationId');
+      if (!['CREATE_ORDER','AUTHORIZE','CAPTURE','VOID'].includes(e.operationKind) || typeof e.providerStatus !== 'string' || !e.providerStatus.trim()) fail('Reconciliation evidence is incomplete.');
+      explain('PayPal provider status was verified during reconciliation.');
+      metadata = { operationId:e.operationId, operationKind:e.operationKind, providerStatus:e.providerStatus, providerResourceId:e.providerResourceId ?? null };
+      break;
     case 'MISSED_CHECK_IN':
       if (oldState!=='AUTHORIZED'||!provider.authorizationId) fail('Missed check-in requires an authorized payment.');
       requireReason(); move('VOID_PENDING'); break;
     case 'VOID_REQUESTED':
-      if (oldState!=='MEETUP_ACTIVE'||!provider.authorizationId) fail('Void request requires an active authorized meetup.');
+      if (!['AUTHORIZED','MEETUP_ACTIVE'].includes(oldState)||!provider.authorizationId) fail('Void request requires an eligible authorized transaction.');
       requireReason(); move('VOID_PENDING'); break;
     case 'PAYPAL_VOID_CONFIRMED':
       if (oldState!=='VOID_PENDING'||!provider.authorizationId) fail('Void confirmation requires a pending void and authorization.');
@@ -151,6 +158,79 @@ export function transitionTransaction(transaction, event, context = {}) {
   eventOwners.set(e.eventId,r.transactionId);
   aggregates.set(r.transactionId,updated);
   return next;
+}
+
+const PERSISTED_VERSION_LIMIT = 100000;
+
+/** Serializable, non-authoritative copy of an aggregate for durable storage. */
+export function serializeTransaction(transaction) {
+  const r = transaction && snapshots.get(transaction);
+  if (!r) fail("Transaction was not created by createTransaction.", "UNTRUSTED_TRANSACTION");
+  return structuredClone({ transactionId:r.transactionId, mandateId:r.mandate.mandateId, mandate:r.mandate, proposal:r.proposal, proposalVersion:r.proposalVersion, proposalFingerprint:r.proposalFingerprint, buyerId:r.buyerId, sellerId:r.sellerId, version:r.version, state:r.state, createdAt:r.createdAt, updatedAt:r.updatedAt, policyEvidence:r.policyEvidence, guardianApproval:r.guardianApproval, handoffConfirmations:r.handoffConfirmations, provider:r.provider, auditLog:r.auditLog, eventDigests:[...r.eventDigests.entries()].map(([eventId,digest])=>({eventId,digest})) });
+}
+
+/**
+ * Rebuilds a factory-issued snapshot from a persisted record. The stored audit
+ * chain, state, version, proposal fingerprint, and identity bindings must be
+ * internally consistent; anything else is rejected rather than repaired.
+ */
+export function hydrateTransaction(record) {
+  if (!record || typeof record !== "object" || Array.isArray(record) || !isPlainData(record)) fail("Persisted transaction must be plain JSON-compatible data.", "INVALID_PERSISTED_TRANSACTION");
+  const { transactionId, mandate, proposal, buyerId, sellerId = null, version, state, createdAt, updatedAt } = record;
+  if (typeof transactionId !== "string" || !transactionId.trim()) fail("Persisted transaction needs a transactionId.", "INVALID_PERSISTED_TRANSACTION");
+  if (typeof buyerId !== "string" || !buyerId.trim()) fail("Persisted transaction needs a buyerId.", "INVALID_PERSISTED_TRANSACTION");
+  if (sellerId !== null && (typeof sellerId !== "string" || !sellerId.trim())) fail("Persisted transaction sellerId is invalid.", "INVALID_PERSISTED_TRANSACTION");
+  if (sellerId && sellerId === buyerId) fail("Persisted transaction has colliding buyer and seller identities.", "INVALID_PERSISTED_TRANSACTION");
+  const mandateCheck = validateMandate(mandate);
+  if (!mandateCheck.valid) fail(`Persisted mandate is invalid: ${mandateCheck.errors.join(' ')}`, "INVALID_PERSISTED_TRANSACTION");
+  if (record.mandateId !== mandate.mandateId) fail("Persisted transaction mandateId does not match its mandate.", "INVALID_PERSISTED_TRANSACTION");
+  if (!isPlainData(proposal) || (proposal?.sellerId ?? null) !== sellerId) fail("Persisted proposal does not match the transaction seller binding.", "INVALID_PERSISTED_TRANSACTION");
+  if (parseIsoInstant(createdAt) === null || parseIsoInstant(updatedAt) === null) fail("Persisted transaction timestamps are invalid.", "INVALID_PERSISTED_TRANSACTION");
+  if (!Number.isInteger(version) || version < 0 || version > PERSISTED_VERSION_LIMIT) fail("Persisted transaction version is invalid.", "INVALID_PERSISTED_TRANSACTION");
+  if (!STATES.includes(state)) fail("Persisted transaction state is invalid.", "INVALID_PERSISTED_TRANSACTION");
+  const auditLog = record.auditLog;
+  if (!Array.isArray(auditLog) || auditLog.length !== version) fail("Persisted audit history does not match the transaction version.", "INVALID_PERSISTED_TRANSACTION");
+  const seen = new Set();
+  let previousState = 'PROPOSED';
+  for (const event of auditLog) {
+    if (!event || typeof event !== "object" || Array.isArray(event) || !isPlainData(event)) fail("Persisted audit event is not plain data.", "INVALID_PERSISTED_TRANSACTION");
+    if (typeof event.eventId !== "string" || !event.eventId.trim() || seen.has(event.eventId)) fail("Persisted audit event IDs must be unique non-empty strings.", "INVALID_PERSISTED_TRANSACTION");
+    if (event.transactionId !== transactionId) fail("Persisted audit event belongs to another transaction.", "INVALID_PERSISTED_TRANSACTION");
+    if (event.previousState !== previousState) fail("Persisted audit chain is not contiguous.", "INVALID_PERSISTED_TRANSACTION");
+    const sameStateEvent = event.newState === event.previousState;
+    if (!STATES.includes(event.newState) || (!sameStateEvent && !ALLOWED_TRANSITIONS[event.previousState]?.includes(event.newState))) fail("Persisted audit event contains a disallowed state transition.", "INVALID_PERSISTED_TRANSACTION");
+    if (typeof event.eventType !== "string" || !event.eventType.trim()) fail("Persisted audit event type is invalid.", "INVALID_PERSISTED_TRANSACTION");
+    if (!event.actor || typeof event.actor.id !== "string" || !event.actor.id.trim() || !ACTOR_ROLES.has(event.actor.role)) fail("Persisted audit event actor is invalid.", "INVALID_PERSISTED_TRANSACTION");
+    if (parseIsoInstant(event.timestamp) === null) fail("Persisted audit event timestamp is invalid.", "INVALID_PERSISTED_TRANSACTION");
+    if (typeof event.reason !== "string" || !event.reason.trim()) fail("Persisted audit event reason is invalid.", "INVALID_PERSISTED_TRANSACTION");
+    seen.add(event.eventId);
+    previousState = event.newState;
+  }
+  if (previousState !== state) fail("Persisted transaction state does not match its audit history.", "INVALID_PERSISTED_TRANSACTION");
+  const fingerprint = proposalFingerprint(proposal);
+  if (record.proposalFingerprint !== fingerprint) fail("Persisted proposal does not match its fingerprint.", "INVALID_PERSISTED_TRANSACTION");
+  if (!Number.isInteger(record.proposalVersion) || record.proposalVersion < 1) fail("Persisted proposal version is invalid.", "INVALID_PERSISTED_TRANSACTION");
+  const digests = new Map();
+  const persistedDigests = Array.isArray(record.eventDigests) ? record.eventDigests : [];
+  for (const entry of persistedDigests) {
+    if (!entry || typeof entry.eventId !== "string" || typeof entry.digest !== "string" || !entry.digest) fail("Persisted event digest is invalid.", "INVALID_PERSISTED_TRANSACTION");
+    if (!seen.has(entry.eventId)) fail("Persisted event digest has no matching audit event.", "INVALID_PERSISTED_TRANSACTION");
+    digests.set(entry.eventId, entry.digest);
+  }
+  if (digests.size !== seen.size) fail("Persisted event digest list is incomplete.", "INVALID_PERSISTED_TRANSACTION");
+
+  const existing = aggregates.get(transactionId);
+  if (existing && existing.version === version && existing.currentSnapshot) return existing.currentSnapshot;
+  for (const eventId of seen) {
+    const owner = eventOwners.get(eventId);
+    if (owner && owner !== transactionId) fail("Persisted event ID is assigned to another transaction.", "EVENT_ID_COLLISION");
+  }
+
+  const r = { transactionId, mandate:deepFreeze(structuredClone(mandate)), proposal:deepFreeze(structuredClone(proposal)), proposalVersion:record.proposalVersion, proposalFingerprint:fingerprint, buyerId, sellerId, version, state, createdAt, updatedAt, policyEvidence:record.policyEvidence ? deepFreeze(structuredClone(record.policyEvidence)) : null, guardianApproval:record.guardianApproval ? deepFreeze(structuredClone(record.guardianApproval)) : null, handoffConfirmations:deepFreeze({buyerConfirmed:false,sellerConfirmed:false,buyerActorId:null,sellerActorId:null,...(record.handoffConfirmations ?? {})}), provider:deepFreeze({orderId:null,authorizationId:null,captureId:null,voidId:null,...(record.provider ?? {})}), auditLog:deepFreeze(structuredClone(auditLog)), eventDigests:digests, currentSnapshot:null };
+  r.currentSnapshot = makeSnapshot(r);
+  aggregates.set(transactionId, r);
+  for (const eventId of seen) eventOwners.set(eventId, transactionId);
+  return r.currentSnapshot;
 }
 
 

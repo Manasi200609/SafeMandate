@@ -15,9 +15,9 @@ export function validateProposal(p) {
   if (typeof p.locationIsPublic !== 'boolean') errors.push('locationIsPublic must be a boolean.');
   if (typeof p.proposedLocalMeetupTime !== 'string' || !TIME_RE.test(p.proposedLocalMeetupTime)) errors.push('proposedLocalMeetupTime must use 24-hour HH:mm format.');
   if (!validIanaTimeZone(p.timeZone)) errors.push('timeZone must be a valid IANA timezone.');
-  if (!Number.isInteger(p.aiRiskScore) || p.aiRiskScore < 0 || p.aiRiskScore > 100) errors.push('aiRiskScore must be an integer from 0 to 100.');
-  if (!Array.isArray(p.riskSignals) || p.riskSignals.some((x) => typeof x !== 'string')) errors.push('riskSignals must be an array of strings.');
-  if (!Array.isArray(p.supportingEvidence) || p.supportingEvidence.some((x) => typeof x !== 'string')) errors.push('supportingEvidence must be an array of strings.');
+  if (p.aiRiskScore !== undefined && (!Number.isInteger(p.aiRiskScore) || p.aiRiskScore < 0 || p.aiRiskScore > 100)) errors.push('aiRiskScore must be an integer from 0 to 100 when provided.');
+  if (p.riskSignals !== undefined && (!Array.isArray(p.riskSignals) || p.riskSignals.some((x) => typeof x !== 'string'))) errors.push('riskSignals must be an array of strings when provided.');
+  if (p.supportingEvidence !== undefined && (!Array.isArray(p.supportingEvidence) || p.supportingEvidence.some((x) => typeof x !== 'string'))) errors.push('supportingEvidence must be an array of strings when provided.');
   if (parseIsoInstant(p.createdAt) === null) errors.push('createdAt must be a valid ISO-8601 timestamp with a real calendar date and timezone.');
   return { valid: errors.length === 0, errors };
 }
@@ -49,7 +49,13 @@ export function evaluateProposal(mandate, proposal, now = new Date().toISOString
   if (mandate.meetupRules.requirePublicPlace && !proposal.locationIsPublic) { reasons.push('MEETUP_NOT_PUBLIC'); explain.push('Meetup must be in a public place.'); }
   if (proposal.timeZone !== mandate.meetupRules.timeZone) { reasons.push('MEETUP_TIMEZONE_MISMATCH'); explain.push('Meetup timezone does not match the mandate timezone.'); }
   else if (proposal.proposedLocalMeetupTime < mandate.meetupRules.daytimeStart || proposal.proposedLocalMeetupTime > mandate.meetupRules.daytimeEnd) { reasons.push('MEETUP_OUTSIDE_DAYTIME'); explain.push('Meetup is outside the permitted daytime window.'); }
-  if (proposal.aiRiskScore >= mandate.riskThreshold) { reasons.push('RISK_ABOVE_THRESHOLD'); explain.push('AI risk score meets or exceeds the maximum acceptable threshold.'); }
+  // A high AI risk score may only add a conservative guardian review. It cannot
+  // override deterministic mandate conditions. Transaction creation strips
+  // caller-supplied AI fields; only a future trusted server assessment may add it.
+  if (Number.isInteger(proposal.aiRiskScore) && proposal.aiRiskScore >= mandate.riskThreshold) {
+    reasons.push('RISK_ABOVE_THRESHOLD');
+    explain.push('AI risk score meets or exceeds the maximum acceptable threshold.');
+  }
   if (reasons.length) return result('NEEDS_GUARDIAN', reasons, explain.join(' '), true, false);
   return result('READY_FOR_PAYMENT', [], 'Proposal satisfies the active mandate.', false, true);
 }

@@ -15,6 +15,7 @@ import './styles.css';
 import './styles/mobile-pwa.css';
 import './styles/premium.css';
 import './styles/app-theme.css';
+import './styles/cinematic.css';
 ReactDOM.createRoot(document.getElementById('root')).render(<React.StrictMode><BrowserRouter><App /></BrowserRouter></React.StrictMode>);
 
 if(import.meta.env.PROD && 'serviceWorker' in navigator){

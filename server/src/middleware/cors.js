@@ -10,7 +10,7 @@ export function createCorsMiddleware(allowedOrigins) {
     if (origin) {
       res.set('Access-Control-Allow-Origin', origin);
       res.set('Vary', 'Origin');
-      res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
       res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       res.set('Access-Control-Max-Age', '600');
     }

@@ -3,16 +3,16 @@ import { useTranslation } from 'react-i18next';
 import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, LineChart, Line } from 'recharts';
 import { currentLocale, numberLabel } from '../services/format.js';
 
-const accent='#D9FF32';
-const steel='#16D8E7';
-const muted='#929292';
-const grid='#303030';
-const outcomes=['#777777','#D6B955',accent,'#E17878'];
-const categories=[accent,'#16D8E7','#A8A8A8','#D6B955','#57D9B1'];
+const accent='#16D6CF';
+const steel='#00AFAE';
+const muted='#829293';
+const grid='#1B292B';
+const outcomes=['#687879','#D6B955',accent,'#E17878'];
+const categories=[accent,'#00AFAE','#A8B7B7','#D6B955','#57D9B1'];
 const tooltip={
-  contentStyle:{background:'#151515',border:'1px solid #303030',borderRadius:8,color:'#F6F6F4',fontSize:12,padding:'10px 12px'},
+  contentStyle:{background:'#0C1416',border:'1px solid #1B292B',borderRadius:8,color:'#F2F7F6',fontSize:12,padding:'10px 12px'},
   labelStyle:{color:'#B0B0B0',marginBottom:4},
-  itemStyle:{color:'#D9FF32'},
+  itemStyle:{color:'#16D6CF'},
   cursor:{fill:'rgba(255,255,255,.045)'},
 };
 
@@ -46,7 +46,7 @@ export function OutcomeChart({data}){
   const {t}=useTranslation();
   const animate=useInitialChartAnimation();
   return <ResponsiveContainer width="100%" height="100%"><PieChart>
-    <Pie isAnimationActive={animate} animationDuration={450} data={data} dataKey="value" nameKey="name" innerRadius="64%" outerRadius="86%" paddingAngle={3} stroke="#151515" strokeWidth={2}>{data.map((d,i)=><Cell key={d.name} fill={outcomes[i%outcomes.length]}/>)}</Pie>
+    <Pie isAnimationActive={animate} animationDuration={450} data={data} dataKey="value" nameKey="name" innerRadius="64%" outerRadius="86%" paddingAngle={3} stroke="#0C1416" strokeWidth={2}>{data.map((d,i)=><Cell key={d.name} fill={outcomes[i%outcomes.length]}/>)}</Pie>
     <Tooltip {...tooltip} labelFormatter={value=>t(value,{defaultValue:value})} formatter={value=>[numberLabel(Number(value)),t('chart.transactions')]}/>
   </PieChart></ResponsiveContainer>;
 }
@@ -55,7 +55,7 @@ export function CategoryChart({data}){
   const {t}=useTranslation();
   const animate=useInitialChartAnimation();
   if(!data.length)return <Empty messageKey="chart.noCategories"/>;
-  return <ResponsiveContainer width="100%" height="100%"><PieChart><Pie isAnimationActive={animate} animationDuration={450} data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="83%" paddingAngle={2} stroke="#151515" strokeWidth={2}>{data.map((d,i)=><Cell key={d.name} fill={categories[i%categories.length]}/>)}</Pie><Tooltip {...tooltip} labelFormatter={value=>t(`category.${value}`,{defaultValue:value})} formatter={value=>new Intl.NumberFormat(currentLocale(),{style:'currency',currency:'INR'}).format(Number(value))}/></PieChart></ResponsiveContainer>;
+  return <ResponsiveContainer width="100%" height="100%"><PieChart><Pie isAnimationActive={animate} animationDuration={450} data={data} dataKey="value" nameKey="name" innerRadius="62%" outerRadius="83%" paddingAngle={2} stroke="#0C1416" strokeWidth={2}>{data.map((d,i)=><Cell key={d.name} fill={categories[i%categories.length]}/>)}</Pie><Tooltip {...tooltip} labelFormatter={value=>t(`category.${value}`,{defaultValue:value})} formatter={value=>new Intl.NumberFormat(currentLocale(),{style:'currency',currency:'INR'}).format(Number(value))}/></PieChart></ResponsiveContainer>;
 }
 
 export function UtilizationChart({data,captured}){

@@ -1,11 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import app from '../../src/app.js';
+import { createApp } from '../../src/app.js';
 import { getHealth } from '../../src/controllers/healthController.js';
 import { postValidateMandate } from '../../src/controllers/mandateController.js';
 import { postEvaluateProposal } from '../../src/controllers/policyController.js';
 import { createCorsMiddleware } from '../../src/middleware/cors.js';
 import { errorHandler, notFoundHandler } from '../../src/middleware/errors.js';
+
+const app = createApp({ config: { frontendOrigins: ['http://127.0.0.1:5173'], sessionTtlMinutes: 480 } });
 
 function responseRecorder() {
   return {
@@ -21,7 +23,38 @@ test('Express app mounts the required API routes and centralized handlers', () =
   const layers = app.router.stack;
   const mountedApi = layers.find((layer) => layer.name === 'router')?.handle;
   const routes = mountedApi?.stack.map((layer) => `${Object.keys(layer.route.methods)[0].toUpperCase()} /api${layer.route.path}`);
-  assert.deepEqual(routes, ['GET /api/health', 'POST /api/mandates/validate', 'POST /api/policy/evaluate']);
+  assert.deepEqual(routes, [
+    'GET /api/health',
+    'POST /api/auth/register',
+    'POST /api/auth/login',
+    'POST /api/auth/logout',
+    'GET /api/auth/session',
+    'POST /api/mandates/validate',
+    'POST /api/policy/evaluate',
+    'GET /api/mandates/current',
+    'PUT /api/mandates/current',
+    'POST /api/guardian-relationships',
+    'GET /api/guardian-relationships',
+    'POST /api/guardian-relationships/:relationshipId/accept',
+    'POST /api/transactions',
+    'GET /api/transactions',
+    'GET /api/transactions/:transactionId',
+    'GET /api/transactions/:transactionId/audit',
+    'GET /api/transactions/:transactionId/check-ins',
+    'GET /api/transactions/:transactionId/payment-reference',
+    'POST /api/transactions/:transactionId/evaluate',
+    'POST /api/transactions/:transactionId/guardian-approval',
+    'POST /api/transactions/:transactionId/handoff-confirmations',
+    'POST /api/transactions/:transactionId/meetup/start',
+    'POST /api/transactions/:transactionId/check-ins',
+    'POST /api/transactions/:transactionId/paypal/order',
+    'POST /api/transactions/:transactionId/paypal/authorize',
+    'POST /api/transactions/:transactionId/paypal/capture',
+    'POST /api/transactions/:transactionId/paypal/void',
+    'POST /api/transactions/:transactionId/paypal/reconcile',
+    'GET /api/transactions/:transactionId/payment-status',
+    'POST /api/ai/assessments',
+  ]);
   assert.ok(layers.some((layer) => layer.name === 'notFoundHandler'));
   assert.ok(layers.some((layer) => layer.name === 'errorHandler'));
 });
@@ -39,6 +72,10 @@ test('development frontend CORS origin is allowed and other origins are rejected
   cors({ get: () => 'http://127.0.0.1:5173', method: 'GET' }, allowedRes, () => {});
   assert.equal(allowedRes.headers['access-control-allow-origin'], 'http://127.0.0.1:5173');
   assert.equal(allowedRes.headers.vary, 'Origin');
+  const preflightRes = responseRecorder();
+  cors({ get: (name) => name === 'origin' ? 'http://127.0.0.1:5173' : null, method: 'OPTIONS' }, preflightRes, () => assert.fail('preflight should end in CORS middleware'));
+  assert.equal(preflightRes.code, 204);
+  assert.match(preflightRes.headers['access-control-allow-methods'], /PUT/);
 
   const rejectedRes = responseRecorder();
   cors({ get: () => 'https://example.invalid', method: 'GET' }, rejectedRes, () => assert.fail('unapproved origin passed'));

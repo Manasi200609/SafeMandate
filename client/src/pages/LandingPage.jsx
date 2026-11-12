@@ -10,6 +10,7 @@ import {
 import { Link } from 'react-router-dom';
 import TopNav from '../components/TopNav.jsx';
 import PageFrame from '../components/PageFrame.jsx';
+import RibbonScene from '../components/RibbonScene.jsx';
 import { useToast } from '../components/ToastContext.jsx';
 import '../styles/landing.css';
 
@@ -19,6 +20,7 @@ function ProductPreview(){
   const {t}=useTranslation();
   const steps=[['01',t('landingV2.preview.step1'),true],['02',t('landingV2.preview.step2'),true],['03',t('landingV2.preview.step3'),true],['04',t('landingV2.preview.step4'),false],['05',t('landingV2.preview.step5'),false]];
   return <motion.div className="landing-product" {...reveal}>
+    <RibbonScene className="lp-ribbon-mark" />
     <div className="lp-orbit lp-orbit-one" aria-hidden="true"/><div className="lp-orbit lp-orbit-two" aria-hidden="true"/>
     <div className="lp-product-window">
       <div className="lp-window-bar"><div className="lp-brand-mini"><span><ShieldCheck size={13}/></span>safemandate</div><span className="lp-preview-tag"><i/>{t('landingV2.preview.illustrative')}</span><span className="lp-window-account">{t('landingV2.preview.buyer')}</span></div>

@@ -8,6 +8,7 @@ import { CategoryChart, OutcomeChart, WeeklyChart } from '../components/Charts.j
 import { demoService, deriveAnalytics } from '../services/demoService.js';
 import { dateLabel, money, numberLabel } from '../services/format.js';
 import { CURRENCY_MINOR_UNITS } from '../data/currencyMeta.js';
+import RibbonScene from '../components/RibbonScene.jsx';
 
 function Widget({ title, eyebrow, children, className = '', action }) {
   return <section className={`panel fin-widget ${className}`}><div className="fin-widget-head"><div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2></div>{action}</div>{children}</section>;
@@ -36,6 +37,7 @@ export default function DashboardPage() {
 
     <div className="fin-dashboard-grid">
       <section className="fin-balance-card">
+        <RibbonScene className="fin-ribbon-mark" />
         <div className="fin-balance-top"><span>{t('copy.active_mandate_2a08611')}</span><span className="fin-balance-live"><i/>{t('copy.active_1df0eaf')}</span></div>
         <strong>{money(mandate.maxAmountMinor, mandate.currency)}</strong>
         <span className="fin-balance-caption">{t('copy.maximum_purchase_8503bee')}{mandate.currency}</span>
