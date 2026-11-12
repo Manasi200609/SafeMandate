@@ -95,7 +95,7 @@ export function createPayPalTransport({ clientId, clientSecret, baseUrl = SANDBO
         // contains the actionable schema/business validation code.
         issue: String(data?.details?.find((detail) => typeof detail?.issue === 'string')?.issue ?? data?.error ?? data?.name ?? 'PROVIDER_ERROR').toUpperCase().replaceAll('-', '_'),
         field: data?.details?.find((detail) => typeof detail?.field === 'string')?.field ?? null,
-        debugId: response.headers.get('paypal-debug-id'),
+        debugId: data?.debug_id ?? response.headers.get('paypal-debug-id'),
       });
     }
     return { status: response.status, data };

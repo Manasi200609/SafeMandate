@@ -128,7 +128,7 @@ test('order and authorization are transaction-bound, use persisted amount, and r
 });
 
 test('payment status exposes only the sanitized provider error code for a failed order', async (t) => {
-  const provider = fakePayPal({ createOrderError: new PayPalApiError({ status: 400, issue: 'INVALID_PARAMETER_SYNTAX', field: '/purchase_units/0/payee/merchant_id' }) });
+  const provider = fakePayPal({ createOrderError: new PayPalApiError({ status: 400, issue: 'INVALID_PARAMETER_SYNTAX', field: '/purchase_units/0/payee/merchant_id', debugId: 'SAFE-DEBUG-123' }) });
   const f = await fixture(provider);
   t.after(f.close);
   const failed = await createOrder(f);
@@ -138,6 +138,7 @@ test('payment status exposes only the sanitized provider error code for a failed
   assert.equal(status.body.operations[0].status, 'FAILED');
   assert.equal(status.body.operations[0].providerErrorCode, 'INVALID_PARAMETER_SYNTAX');
   assert.equal(status.body.operations[0].providerErrorField, '/purchase_units/0/payee/merchant_id');
+  assert.equal(status.body.operations[0].providerDebugId, 'SAFE-DEBUG-123');
   assert.equal(JSON.stringify(status.body).includes('PayPal Sandbox request failed'), false);
   assert.equal(provider.calls.create, 1);
 });

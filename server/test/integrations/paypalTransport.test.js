@@ -55,12 +55,13 @@ test('PayPal HTTP errors prefer the specific sanitized details issue over the ge
     calls += 1;
     return calls === 1
       ? response(200, { access_token: 'token', expires_in: 3600 })
-      : response(400, { name: 'INVALID_REQUEST', message: 'Sensitive provider text', details: [{ field: '/purchase_units/0/payee/merchant_id', value: 'must-not-be-returned', issue: 'INVALID_PARAMETER_SYNTAX', description: 'Sensitive detail' }] });
+      : response(400, { name: 'INVALID_REQUEST', message: 'Sensitive provider text', debug_id: 'SAFE-DEBUG-123', details: [{ field: '/purchase_units/0/payee/merchant_id', value: 'must-not-be-returned', issue: 'INVALID_PARAMETER_SYNTAX', description: 'Sensitive detail' }] });
   } });
   await assert.rejects(transport.request('POST', '/v2/checkout/orders', {}, { requestId: 'order-v1' }), (error) => {
     assert.equal(error.status, 400);
     assert.equal(error.issue, 'INVALID_PARAMETER_SYNTAX');
     assert.equal(error.field, '/purchase_units/0/payee/merchant_id');
+    assert.equal(error.debugId, 'SAFE-DEBUG-123');
     assert.equal(error.message.includes('Sensitive'), false);
     return true;
   });
