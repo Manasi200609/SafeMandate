@@ -233,7 +233,7 @@ export function createPaymentService({ repositories, transactionService, paypalA
         throw new ApiError(202, 'PAYMENT_OUTCOME_UNKNOWN', 'PayPal returned an incomplete order result; reconcile before retrying.');
       }
       const fullOrder = responseData(await readProvider(() => configured.adapter.getOrder(createdOrderId)));
-      if (!verifyPayeeAndOrder(fullOrder, { ...record, provider: { ...record.provider, orderId: createdOrderId } }, configured.merchantId, ['CREATED', 'APPROVED'])) {
+      if (!verifyPayeeAndOrder(fullOrder, { ...record, provider: { ...record.provider, orderId: createdOrderId } }, configured.merchantId, ['CREATED', 'APPROVED', 'PAYER_ACTION_REQUIRED'])) {
         await updateOperation(operation, 'PENDING', { status: 'UNKNOWN', providerResourceId: createdOrderId, providerStatus: fullOrder?.status ?? null, providerErrorCode: 'ORDER_VALIDATION_FAILED' });
         throw new ApiError(202, 'PAYMENT_OUTCOME_UNKNOWN', 'The created order did not match the persisted transaction. Reconcile before retrying.');
       }
@@ -476,13 +476,13 @@ export function createPaymentService({ repositories, transactionService, paypalA
         if (!record.provider?.orderId && !resourceId) throw new ApiError(409, 'RECONCILIATION_UNRESOLVED', 'The provider order ID is not known; this operation requires manual Sandbox review.');
         const orderId = record.provider?.orderId ?? resourceId;
         const order = responseData(await configured.adapter.getOrder(orderId));
-        if (!verifyPayeeAndOrder(order, { ...record, provider: { ...record.provider, orderId } }, configured.merchantId, ['CREATED', 'APPROVED', 'COMPLETED'])) {
+        if (!verifyPayeeAndOrder(order, { ...record, provider: { ...record.provider, orderId } }, configured.merchantId, ['CREATED', 'APPROVED', 'PAYER_ACTION_REQUIRED', 'COMPLETED'])) {
           throw new ApiError(409, 'PROVIDER_STATE_MISMATCH', 'PayPal order does not match this transaction.');
         }
         providerStatus = order.status;
         if (unresolved.kind === 'CREATE_ORDER') {
           const approvalUrl = unresolved.approvalUrl ?? findApprovalUrl(order.links);
-          if (order.status === 'CREATED' && !approvalUrl) return unresolvedResponse(transactionId, record, operations);
+          if (['CREATED', 'PAYER_ACTION_REQUIRED'].includes(order.status) && !approvalUrl) return unresolvedResponse(transactionId, record, operations);
           if (!record.provider?.orderId) await transactionService.applyPaymentEvent({ transactionId, type: 'PAYMENT_ORDER_CREATED', extra: { orderId, providerStatus: order.status, amountMinor: record.proposal.amountMinor, currency: record.proposal.currency } });
           await updateOperation(unresolved, unresolved.status, { status: 'COMPLETED', providerResourceId: orderId, providerStatus: order.status, providerTimestamp: order.create_time ?? nowIso(), approvalUrl });
         } else {

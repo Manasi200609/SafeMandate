@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, LoaderCircle } from 'lucide-react';
 import { authorizePayPalOrder, createPayPalOrder, getPaymentStatus, getTransaction, reconcilePayPalPayment } from '../services/api.js';
 import { canStartPayPalCheckout } from '../services/transactionDraft.js';
-import { getPayPalCheckoutState, recoverPayPalSdkError, verifyPayPalApproval } from '../services/paypalCheckout.js';
+import { getPayPalCheckoutState, recoverPayPalSdkError, resumePayPalApproval, verifyPayPalApproval } from '../services/paypalCheckout.js';
 import { claimPayPalCheckout, createPayPalAuthorizationSession, findPayPalEligibility, loadPayPalSdkV6, PayPalSdkError, releasePayPalCheckout, requestPayPalSdkOrder, startPayPalPopupSession } from '../services/paypalSdkV6.js';
 import { money } from '../services/format.js';
 import './PayPalV6CheckoutButton.css';
@@ -12,6 +12,7 @@ const messagesByState = {
   'sdk-error': 'paypalV6.unavailable',
   ineligible: 'paypalV6.ineligible',
   'eligibility-warning': 'paypalV6.eligibilityWarning',
+  'approval-required': 'paypalV6.approvalRequired',
   starting: 'paypalV6.starting',
   authorizing: 'paypalV6.verifying',
   fallback: 'paypalV6.popupFallback',
@@ -33,12 +34,13 @@ export default function PayPalV6CheckoutButton({ transaction, token, onRefresh, 
   const [session, setSession] = useState(null);
   const [eligible, setEligible] = useState(false);
   const [canCheckout, setCanCheckout] = useState(false);
+  const [existingApprovalUrl, setExistingApprovalUrl] = useState('');
   const [state, setState] = useState('loading');
   const [reconciling, setReconciling] = useState(false);
 
   useEffect(() => {
     let active = true;
-    setState('loading'); setEligible(false); setCanCheckout(false); setSession(null); createdOrderId.current = '';
+    setState('loading'); setEligible(false); setCanCheckout(false); setSession(null); setExistingApprovalUrl(''); createdOrderId.current = '';
     Promise.all([loadPayPalSdkV6(), getPaymentStatus(transaction.transactionId, token), getTransaction(transaction.transactionId, token)])
       .then(async ([sdk, payment, latestTransaction]) => {
         if (!active) return;
@@ -48,6 +50,17 @@ export default function PayPalV6CheckoutButton({ transaction, token, onRefresh, 
         }
         const status = checkoutStatus(payment, latestTransaction);
         if (status === 'authorized') { setState('authorized'); return; }
+        if (latestTransaction.state === 'PAYMENT_PENDING'
+          && payment?.provider?.orderId
+          && payment.provider.orderId === latestTransaction.provider?.orderId) {
+          const orderOperation = payment.operations?.find((operation) => operation.kind === 'CREATE_ORDER'
+            && operation.status === 'COMPLETED' && operation.providerResourceId === payment.provider.orderId);
+          if (orderOperation?.approvalUrl) {
+            setExistingApprovalUrl(orderOperation.approvalUrl);
+            setState('approval-required');
+            return;
+          }
+        }
         if (status !== 'ready') { setState(status); return; }
         const allowed = await findPayPalEligibility(sdk, latestTransaction);
         if (!active) return;
@@ -205,10 +218,21 @@ export default function PayPalV6CheckoutButton({ transaction, token, onRefresh, 
     } catch { setState('unresolved'); setCanCheckout(false); }
     finally { setReconciling(false); }
   }
+  function resumeExistingApproval() {
+    try {
+      resumePayPalApproval({
+        transactionId: transaction.transactionId,
+        orderId: transaction.provider?.orderId,
+        approvalUrl: existingApprovalUrl,
+        token,
+      });
+    } catch { setState('unresolved'); }
+  }
   const showButton = eligible && canCheckout && ['ready', 'cancelled', 'error', 'eligibility-warning'].includes(state);
   return <div className={`paypal-v6-control${busy ? ' is-busy' : ''}`}>
     <div className="paypal-v6-amount">{money(transaction.amountMinor, transaction.currency)}</div>
     {showButton && <paypal-button ref={buttonRef} type="checkout" class="paypal-gold" aria-label={t('paypalV6.buttonLabel')} />}
+    {state === 'approval-required' && <button type="button" className="paypal-v6-resume" onClick={resumeExistingApproval}>{t('paypalV6.resumeApproval')}</button>}
     {busy && <span className="paypal-v6-progress" role="status"><LoaderCircle size={12} className="payment-spinner"/>{t(state === 'loading' ? 'paypalV6.loading' : state === 'authorizing' ? 'paypalV6.verifying' : state === 'fallback' ? 'paypalV6.popupFallback' : 'paypalV6.starting')}</span>}
     {state === 'authorized' && <span className="paypal-v6-status success" role="status"><CheckCircle2 size={12}/>{t('paypalV6.authorized')}</span>}
     {messageKey && !busy && state !== 'authorized' && <span className={`paypal-v6-status${state === 'cancelled' ? ' neutral' : ' warning'}`} role={state === 'cancelled' ? 'status' : 'alert'}><AlertTriangle size={12}/>{t(messageKey)}</span>}

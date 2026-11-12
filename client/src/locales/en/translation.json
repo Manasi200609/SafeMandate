@@ -944,6 +944,8 @@
   "paypalV6.unavailable": "PayPal checkout could not be loaded. Refresh the page or try again later.",
   "paypalV6.ineligible": "PayPal is not available for this transaction, amount, or currency.",
   "paypalV6.eligibilityWarning": "PayPal could not confirm availability here. Continue only if the backend marks this transaction ready; PayPal will verify checkout availability.",
+  "paypalV6.approvalRequired": "This PayPal order already exists and needs buyer approval.",
+  "paypalV6.resumeApproval": "Continue PayPal approval",
   "paypalV6.starting": "Opening PayPal checkout…",
   "paypalV6.popupFallback": "The popup could not open. Switching to the PayPal checkout overlay…",
   "paypalV6.verifying": "PayPal approved the order. Safe Mandate is verifying authorization…",

@@ -5,6 +5,7 @@ import {
   isPayPalApprovalUrl,
   PAYPAL_HANDOFF_KEY,
   reconcilePayPalReturn,
+  resumePayPalApproval,
   startPayPalCheckout,
   verifyPayPalReturn,
 } from '../src/services/paypalCheckout.js';
@@ -17,6 +18,21 @@ function storageStub() {
     removeItem: (key) => values.delete(key),
   };
 }
+
+test('resuming a persisted PayPal order stores a short-lived handoff and redirects without creating an order', () => {
+  const storage = storageStub();
+  let destination;
+  const result = resumePayPalApproval({
+    transactionId: 'tx_existing', orderId: 'ORDER-EXISTING',
+    approvalUrl: 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER-EXISTING',
+    token: 'buyer-token', storage, navigate: (url) => { destination = url; }, now: 123,
+  });
+  assert.deepEqual(result, { kind: 'redirected', orderId: 'ORDER-EXISTING' });
+  assert.equal(destination, 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER-EXISTING');
+  assert.deepEqual(JSON.parse(storage.getItem(PAYPAL_HANDOFF_KEY)), {
+    transactionId: 'tx_existing', orderId: 'ORDER-EXISTING', token: 'buyer-token', startedAt: 123,
+  });
+});
 
 function orderResponse(overrides = {}) {
   return { operation: {

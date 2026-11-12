@@ -7,9 +7,9 @@ import { request, BUYER, SELLER, MANDATE_BODY, PROPOSAL_BODY, createAcceptedGuar
 
 const MERCHANT = 'SANDBOXMERCHANT123';
 
-function fakePayPal({ captureTimeout = false, orderMismatch = null, createOrderError = null } = {}) {
+function fakePayPal({ captureTimeout = false, orderMismatch = null, createOrderError = null, createStatus = 'CREATED' } = {}) {
   const calls = { create: 0, authorize: 0, capture: 0, void: 0 };
-  let orderStatus = 'CREATED';
+  let orderStatus = createStatus;
   let orderDraft;
   let captureOccurred = false;
   const authorization = {
@@ -125,6 +125,20 @@ test('order and authorization are transaction-bound, use persisted amount, and r
   assert.equal(authReplay.status, 200);
   assert.equal(authReplay.body.replayed, true);
   assert.equal(f.provider.calls.authorize, 1);
+});
+
+test('a PAYER_ACTION_REQUIRED order is persisted as pending approval with its PayPal action link', async (t) => {
+  const f = await fixture(fakePayPal({ createStatus: 'PAYER_ACTION_REQUIRED' }));
+  t.after(f.close);
+  const created = await createOrder(f);
+  assert.equal(created.status, 201);
+  assert.equal(created.body.operation.status, 'COMPLETED');
+  assert.equal(created.body.operation.providerStatus, 'PAYER_ACTION_REQUIRED');
+  assert.equal(created.body.operation.approvalUrl, 'https://www.sandbox.paypal.com/checkoutnow?token=ORDER-123');
+  const transaction = await request(f.baseUrl, 'GET', `/api/transactions/${f.transactionId}`, { token: f.buyerToken });
+  assert.equal(transaction.body.transaction.state, 'PAYMENT_PENDING');
+  assert.equal(transaction.body.transaction.provider.orderId, 'ORDER-123');
+  assert.equal(f.provider.calls.create, 1);
 });
 
 test('payment status exposes only the sanitized provider error code for a failed order', async (t) => {

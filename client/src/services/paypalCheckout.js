@@ -64,6 +64,20 @@ export async function startPayPalCheckout({ transaction, token, createOrder, sto
   }
 }
 
+/** Resume a provider order already persisted by Safe Mandate; never creates another order. */
+export function resumePayPalApproval({ transactionId, orderId, approvalUrl, token, storage = globalThis.sessionStorage, navigate = (url) => window.location.assign(url), now = Date.now() }) {
+  if (typeof transactionId !== 'string' || !transactionId || typeof orderId !== 'string' || !orderId || !token || !isPayPalApprovalUrl(approvalUrl)) {
+    throw new TypeError('A verified pending PayPal order and buyer session are required.');
+  }
+  try {
+    storage?.setItem(PAYPAL_HANDOFF_KEY, JSON.stringify({ transactionId, orderId, token, startedAt: now }));
+  } catch {
+    throw new Error('This browser could not safely preserve the short-lived checkout session. PayPal was not opened.');
+  }
+  navigate(approvalUrl);
+  return { kind: 'redirected', orderId };
+}
+
 export function isConfirmedAuthorization(payment, transaction) {
   const authorization = payment?.operations?.find((operation) => operation.kind === 'AUTHORIZE');
   return payment?.state === 'AUTHORIZED' && transaction?.state === 'AUTHORIZED'

@@ -944,6 +944,8 @@
   "paypalV6.unavailable": "PayPal चेकआउट लोड नहीं हो सका। पेज रीफ़्रेश करें या बाद में प्रयास करें।",
   "paypalV6.ineligible": "इस लेनदेन, राशि या मुद्रा के लिए PayPal उपलब्ध नहीं है।",
   "paypalV6.eligibilityWarning": "PayPal इस ब्राउज़र में उपलब्धता की पुष्टि नहीं कर सका। आगे तभी बढ़ें जब बैकएंड लेनदेन को तैयार बताए; checkout उपलब्धता PayPal सत्यापित करेगा।",
+  "paypalV6.approvalRequired": "यह PayPal ऑर्डर पहले से मौजूद है और खरीदार की मंज़ूरी चाहता है।",
+  "paypalV6.resumeApproval": "PayPal मंज़ूरी जारी रखें",
   "paypalV6.starting": "PayPal चेकआउट खोल रहे हैं…",
   "paypalV6.popupFallback": "पॉपअप नहीं खुला। PayPal चेकआउट ओवरले पर जा रहे हैं…",
   "paypalV6.verifying": "PayPal ने ऑर्डर स्वीकृत किया। Safe Mandate प्राधिकरण की पुष्टि कर रहा है…",
