@@ -1,22 +1,111 @@
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ArrowDownWideNarrow, ArrowUpRight, ArrowRight, Filter, Search, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, LoaderCircle, LockKeyhole, LogIn, LogOut, RefreshCw, Search, ShoppingBag } from 'lucide-react';
 import PageFrame from '../components/PageFrame.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
-import Modal from '../components/Modal.jsx';
-import { demoService } from '../services/demoService.js';
-import { money,dateLabel,numberLabel } from '../services/format.js';
-export default function TransactionsPage(){const { t } = useTranslation();
-const rows=demoService.getTransactions();const [search,setSearch]=useState('');const [status,setStatus]=useState('ALL');const [category,setCategory]=useState('ALL');const [sort,setSort]=useState('newest');const [params,setParams]=useSearchParams();const selected=rows.find(t=>t.id===params.get('selected'))??null;
- const filtered=useMemo(()=>rows.filter(t=>(status==='ALL'||t.state===status)&&(category==='ALL'||t.category===category)&&`${t.id} ${t.item} ${t.seller} ${t.category}`.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>sort==='newest'?b.date.localeCompare(a.date):sort==='oldest'?a.date.localeCompare(b.date):sort==='amount-high'?b.amountMinor-a.amountMinor:a.amountMinor-b.amountMinor),[rows,status,category,search,sort]);
- const clear=()=>{setSearch('');setStatus('ALL');setCategory('ALL');setSort('newest');};
- return <PageFrame className="app-page"><div className="page-shell subpage-shell"><div className="demo-ribbon"><span className="demo-pulse"/>{t('demo.source')}<span className="ribbon-right">{t("copy.no_payment_provider_events_6d4e449")}</span></div><div className="subpage-heading"><div><span className="eyebrow"><ArrowDownWideNarrow size={13}/>{t("copy.proposal_records_ec921ff")}</span><h1>{t("copy.every_proposal_c7ee047")}<em>{t("copy.in_context_e0fc1f7")}</em></h1><p>{t("copy.filter_the_illustrative_records_and_in_c45b0d4")}</p></div><div className="record-count"><b>{numberLabel(filtered.length,{minimumIntegerDigits:2})}</b><span>{t("copy.records_shown_8a48591")}</span></div></div>
- <section className="panel transaction-panel"><div className="transaction-toolbar"><label className="search-field"><Search size={16}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={t("copy.search_item_seller_or_id_ea74740")} aria-label={t("copy.search_transactions_f6d97de")}/>{search&&<button aria-label={t("copy.clear_search_67300d0")} onClick={()=>setSearch('')}><X size={14}/></button>}</label><label className="filter-select"><Filter size={14}/><select value={status} onChange={e=>setStatus(e.target.value)} aria-label={t("copy.filter_by_status_f43653d")}><option value="ALL">{t("copy.all_statuses_6405179")}</option>{['PROPOSED','NEEDS_GUARDIAN','GUARDIAN_APPROVED','READY_FOR_PAYMENT','PAYMENT_PENDING','AUTHORIZED','MEETUP_ACTIVE','CAPTURE_PENDING','CAPTURED','VOID_PENDING','VOIDED','BLOCKED','EXPIRED'].map(x=><option key={x} value={x}>{t('status.'+x)}</option>)}</select></label><label className="filter-select"><select value={category} onChange={e=>setCategory(e.target.value)} aria-label={t("copy.filter_by_category_459a08e")}><option value="ALL">{t("copy.all_categories_060be00")}</option>{[...new Set(rows.map(t=>t.category))].map(c=><option key={c} value={c}>{t('category.'+c)}</option>)}</select></label><label className="filter-select sort-select"><select value={sort} onChange={e=>setSort(e.target.value)} aria-label={t("copy.sort_transactions_7ac7759")}><option value="newest">{t("copy.newest_first_f5ec777")}</option><option value="oldest">{t("copy.oldest_first_6a99c65")}</option><option value="amount-high">{t("copy.amount_high_9681387")}</option><option value="amount-low">{t("copy.amount_low_1242d98")}</option></select></label></div>
-  <div className="transaction-table-wrap"><table className="transaction-table"><thead><tr><th>{t("copy.purchase_160f06d")}</th><th>{t("copy.amount_43dc853")}</th><th>{t("copy.category_a3c686e")}</th><th>{t("copy.date_eb9a4bc")}</th><th>{t("copy.policy_status_6a1d9dd")}</th><th><span className="sr-only">{t("copy.open_details_5c866a7")}</span></th></tr></thead><tbody>{filtered.map(tx=><tr key={tx.id} tabIndex="0" onClick={()=>setParams({selected:tx.id})} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();setParams({selected:tx.id});}}}><td data-label={t("copy.purchase_160f06d")}><div className="table-item"><span className={`table-item-icon icon-${tx.category==='Electronics'?'blue':tx.category==='Outdoor'?'green':'amber'}`}>{tx.category==='Electronics'?'EL':tx.category==='Outdoor'?'OU':'HM'}</span><span><b>{tx.item}</b><small>{tx.id}{t("copy.copy_c80c74a")}{tx.seller}</small></span></div></td><td className="table-amount" data-label={t("copy.amount_43dc853")}>{money(tx.amountMinor,tx.currency)}</td><td data-label={t("copy.category_a3c686e")}><span className="category-pill">{t('category.'+tx.category)}</span></td><td className="date-cell" data-label={t("copy.date_eb9a4bc")}>{dateLabel(tx.date)}</td><td data-label={t("copy.policy_status_6a1d9dd")}><StatusBadge status={tx.state} small/></td><td><button className="row-open" aria-label={t('transaction.viewDetails',{item:tx.item})} onClick={e=>{e.stopPropagation();setParams({selected:tx.id});}}><ArrowUpRight size={15}/></button></td></tr>)}</tbody></table>{!filtered.length&&<div className="table-empty"><span><Search size={20}/></span><b>{t("copy.no_matching_proposals_59a602f")}</b><p>{t("copy.try_changing_a_filter_or_search_phrase_859e312")}</p><button className="text-action" onClick={clear}>{t("copy.clear_all_filters_29b4250")}<ArrowRight size={14}/></button></div>}</div><div className="table-foot"><span>{t('demo.source')}</span><button onClick={clear}>{t("copy.reset_filters_5655310")}</button></div></section>
- <div className="payment-distinction"><span className="distinction-icon"><Filter size={16}/></span><div><b>{t("copy.policy_status_and_payment_status_are_d_b57d3e7")}</b><p>{t("copy.ready_for_payment_means_policy_permits_4c7e6b7")}</p></div><span className="not-connected-pill"><i/>{t("copy.paypal_not_connected_285b29e")}</span></div>
- <Modal open={Boolean(selected)} title={selected?.item??''} onClose={()=>setParams({})} actions={<button className="button button-outline" onClick={()=>setParams({})}>{t("copy.close_details_433da6d")}</button>}>
- {selected&&<div className="transaction-detail"><div className="detail-modal-top"><span className="eyebrow">{selected.id}{t("copy.copy_c80c74a")}{dateLabel(selected.date)}</span><StatusBadge status={selected.state}/></div><div className="detail-amount">{money(selected.amountMinor,selected.currency)}</div><p className="detail-reason">{t('demo.reason.'+selected.id,{defaultValue:selected.reason})}</p><div className="modal-data-grid"><div><span>{t("copy.seller_ec3ef05")}</span><b>{selected.seller}</b></div><div><span>{t("copy.category_a3c686e")}</span><b>{t('category.'+selected.category)}</b></div><div><span>{t("copy.meetup_location_6c95288")}</span><b>{selected.meetup}</b></div><div><span>{t("copy.proposed_time_3baffab")}</span><b>{selected.meetupTime}{t("copy.asia_kolkata_79a86ae")}</b></div></div>{selected.policyCodes.length>0&&<div className="evidence-box"><span className="eyebrow">{t("copy.policy_reasons_4c15e24")}</span>{selected.policyCodes.map(code=><span className="reason-code" key={code}>{t('reasonCode.'+code,{defaultValue:code})}</span>)}</div>}<div className="detail-timeline"><span className="eyebrow">{t("copy.illustrative_timeline_854777c")}</span><div><i/><span><b>{t("copy.proposal_created_b33ef77")}</b><small>{dateLabel(selected.date)}{t("copy.sample_record_0349ac2")}</small></span></div><div><i/><span><b>{t('status.'+selected.state,{defaultValue:selected.state})}</b><small>{t('demo.reason.'+selected.id,{defaultValue:selected.reason})}</small></span></div><div className="timeline-unverified">{t("copy.no_verified_provider_event_is_attached_1cb3fd5")}</div></div></div>}
- </Modal>
- </div></PageFrame>
+import { ApiRequestError, createPayPalOrder, getTransactions, signInBuyer, signOut } from '../services/api.js';
+import { money, dateLabel, numberLabel } from '../services/format.js';
+import { startPayPalCheckout } from '../services/paypalCheckout.js';
+
+const PAYMENT_ACTION_STATES = new Set(['READY_FOR_PAYMENT', 'PAYMENT_PENDING']);
+
+export default function TransactionsPage() {
+  const { t } = useTranslation();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [buyer, setBuyer] = useState(null);
+  const [token, setToken] = useState('');
+  const [transactions, setTransactions] = useState([]);
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('ALL');
+  const [sort, setSort] = useState('newest');
+  const [busy, setBusy] = useState(false);
+  const [busyId, setBusyId] = useState('');
+  const [error, setError] = useState('');
+
+  const loadTransactions = useCallback(async (sessionToken) => {
+    setTransactions(await getTransactions(sessionToken));
+  }, []);
+
+  async function handleSignIn(event) {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      const session = await signInBuyer(email.trim(), password);
+      setToken(session.token);
+      setBuyer(session.user);
+      setPassword('');
+      await loadTransactions(session.token);
+    } catch (requestError) {
+      setError(requestError instanceof ApiRequestError ? requestError.message : t('paypalCheckout.loadError'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSignOut() {
+    try { await signOut(token); } catch { /* Discard the in-memory token even if revocation cannot be reached. */ }
+    setBuyer(null);
+    setToken('');
+    setTransactions([]);
+    setError('');
+  }
+
+  async function handleCheckout(transaction) {
+    if (busyId || !token || !PAYMENT_ACTION_STATES.has(transaction.state)) return;
+    setBusyId(transaction.transactionId);
+    setError('');
+    try {
+      const result = await startPayPalCheckout({
+        transaction,
+        token,
+        createOrder: (transactionId, buyerToken, expectedVersion) => createPayPalOrder(transactionId, buyerToken, expectedVersion),
+      });
+      if (result.kind === 'unresolved') {
+        setError(t('paypalCheckout.unresolved'));
+        await loadTransactions(token).catch(() => {});
+      }
+    } catch (requestError) {
+      setError(requestError instanceof ApiRequestError ? requestError.message : requestError.message || t('paypalCheckout.checkoutError'));
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  const filtered = useMemo(() => transactions
+    .filter((transaction) => (status === 'ALL' || transaction.state === status)
+      && `${transaction.transactionId} ${transaction.itemName ?? ''}`.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => sort === 'oldest' ? a.createdAt.localeCompare(b.createdAt)
+      : sort === 'amount-high' ? b.amountMinor - a.amountMinor
+        : sort === 'amount-low' ? a.amountMinor - b.amountMinor
+          : b.createdAt.localeCompare(a.createdAt)), [transactions, status, search, sort]);
+
+  return <PageFrame className="app-page"><div className="page-shell subpage-shell">
+    <div className="demo-ribbon"><span className="demo-pulse"/>{t('paypalCheckout.liveLabel')}<span className="ribbon-right">{t('paypalCheckout.backendSource')}</span></div>
+    <div className="subpage-heading"><div><span className="eyebrow"><ShoppingBag size={13}/>{t('paypalCheckout.eyebrow')}</span><h1>{t('paypalCheckout.heading')}<em>{t('paypalCheckout.headingAccent')}</em></h1><p>{t('paypalCheckout.description')}</p></div>{buyer && <div className="workspace-chip">{buyer.displayName || buyer.email}<button type="button" className="text-action" onClick={handleSignOut}><LogOut size={13}/>{t('ai.signOut')}</button></div>}</div>
+
+    {!token ? <section className="panel copilot-auth-card payment-auth-card">
+      <div className="copilot-auth-icon"><LockKeyhole size={18}/></div>
+      <div><span className="eyebrow">{t('paypalCheckout.buyerSession')}</span><h2>{t('ai.signInTitle')}</h2><p>{t('paypalCheckout.signInDescription')}</p></div>
+      <form className="copilot-auth-form" onSubmit={handleSignIn}>
+        <label>{t('ai.email')}<input type="email" autoComplete="username" value={email} onChange={(event) => setEmail(event.target.value)} required maxLength={254}/></label>
+        <label>{t('ai.password')}<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required maxLength={256}/></label>
+        <button type="submit" className="button button-lime" disabled={busy}>{busy ? <LoaderCircle size={15} className="payment-spinner"/> : <LogIn size={15}/>}{busy ? t('paypalCheckout.signingIn') : t('ai.signIn')}</button>
+      </form>
+      {error && <p className="copilot-error" role="alert"><AlertTriangle size={15}/>{error}</p>}
+    </section> : <>
+      <section className="panel transaction-panel payment-transactions-panel">
+        <div className="transaction-toolbar"><label className="search-field"><Search size={16}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('paypalCheckout.searchPlaceholder')} aria-label={t('paypalCheckout.searchLabel')}/></label><label className="filter-select"><select value={status} onChange={(event) => setStatus(event.target.value)} aria-label={t('copy.filter_by_status_f43653d')}><option value="ALL">{t('copy.all_statuses_6405179')}</option>{['NEEDS_GUARDIAN','GUARDIAN_APPROVED','READY_FOR_PAYMENT','PAYMENT_PENDING','AUTHORIZED','MEETUP_ACTIVE','CAPTURE_PENDING','CAPTURED','VOID_PENDING','VOIDED','BLOCKED','EXPIRED'].map((value) => <option key={value} value={value}>{t(`status.${value}`)}</option>)}</select></label><label className="filter-select"><select value={sort} onChange={(event) => setSort(event.target.value)} aria-label={t('copy.sort_transactions_7ac7759')}><option value="newest">{t('copy.newest_first_f5ec777')}</option><option value="oldest">{t('copy.oldest_first_6a99c65')}</option><option value="amount-high">{t('copy.amount_high_9681387')}</option><option value="amount-low">{t('copy.amount_low_1242d98')}</option></select></label><button className="icon-button" type="button" onClick={() => loadTransactions(token).catch((loadError) => setError(loadError.message))} aria-label={t('paypalCheckout.refresh')}><RefreshCw size={15}/></button></div>
+        {busy ? <div className="table-empty payment-empty" role="status"><LoaderCircle size={20} className="payment-spinner"/><p>{t('paypalCheckout.loading')}</p></div> : filtered.length ? <div className="transaction-table-wrap"><table className="transaction-table"><thead><tr><th>{t('copy.purchase_160f06d')}</th><th>{t('copy.amount_43dc853')}</th><th>{t('copy.date_eb9a4bc')}</th><th>{t('copy.policy_status_6a1d9dd')}</th><th>{t('paypalCheckout.action')}</th></tr></thead><tbody>{filtered.map((transaction) => {
+          const canCheckout = PAYMENT_ACTION_STATES.has(transaction.state);
+          const isBusy = busyId === transaction.transactionId;
+          return <tr key={transaction.transactionId}><td><div className="table-item"><span className="table-item-icon icon-blue"><ShoppingBag size={14}/></span><span><b>{transaction.itemName || t('paypalCheckout.purchase')}</b><small>{transaction.transactionId}</small></span></div></td><td className="table-amount">{money(transaction.amountMinor, transaction.currency)}</td><td className="date-cell">{dateLabel(transaction.createdAt)}</td><td><StatusBadge status={transaction.state} small/></td><td>{canCheckout ? <button type="button" className="button button-lime button-small payment-start-button" onClick={() => handleCheckout(transaction)} disabled={Boolean(busyId)}>{isBusy ? <LoaderCircle size={13} className="payment-spinner"/> : null}{isBusy ? t('paypalCheckout.starting') : transaction.state === 'PAYMENT_PENDING' ? t('paypalCheckout.continueCheckout') : t('paypalCheckout.startCheckout')}<ArrowRight size={13}/></button> : <span className="payment-unavailable">{t('paypalCheckout.notEligible')}</span>}</td></tr>;
+        })}</tbody></table></div> : <div className="table-empty payment-empty"><span><ShoppingBag size={20}/></span><b>{transactions.length ? t('paypalCheckout.noMatch') : t('paypalCheckout.noTransactions')}</b><p>{transactions.length ? t('paypalCheckout.changeSearch') : t('paypalCheckout.noTransactionsHelp')}</p></div>}
+        <div className="table-foot"><span>{t('paypalCheckout.realRecords', { count: numberLabel(filtered.length) })}</span><span>{t('paypalCheckout.noCaptureHere')}</span></div>
+      </section>
+      {error && <p className="payment-flow-error" role="alert"><AlertTriangle size={15}/>{error}</p>}
+    </>}
+    <div className="payment-distinction"><span className="distinction-icon"><LockKeyhole size={16}/></span><div><b>{t('paypalCheckout.controlTitle')}</b><p>{t('paypalCheckout.controlBody')}</p></div></div>
+  </div></PageFrame>;
 }

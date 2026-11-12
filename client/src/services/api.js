@@ -1,4 +1,5 @@
-const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || '';
+const API_ORIGIN = (import.meta.env?.VITE_API_ORIGIN || '').replace(/\/+$/, '');
+const IS_PRODUCTION = Boolean(import.meta.env?.PROD);
 
 export class ApiRequestError extends Error {
   constructor({ status, code, message }) {
@@ -10,6 +11,9 @@ export class ApiRequestError extends Error {
 }
 
 async function requestJson(path, { method = 'GET', token, body, signal } = {}) {
+  if (IS_PRODUCTION && !API_ORIGIN) {
+    throw new ApiRequestError({ status: 0, code: 'API_BASE_URL_NOT_CONFIGURED', message: 'The deployed API base URL is not configured. Set VITE_API_ORIGIN to the Safe Mandate Render service URL in the frontend deployment settings.' });
+  }
   let response;
   try {
     response = await fetch(`${API_ORIGIN}${path}`, {
@@ -59,7 +63,37 @@ export async function postAiAssessment(token, body, { signal } = {}) {
 }
 
 export async function getApiHealth({ signal } = {}) {
-  const response = await fetch(`${API_ORIGIN}/api/health`, { signal, headers: { Accept: 'application/json' } });
-  if (!response.ok) throw new Error('Safe Mandate API health check failed.');
-  return response.json();
+  return requestJson('/api/health', { signal });
+}
+
+export async function getTransactions(token, { signal } = {}) {
+  const result = await requestJson('/api/transactions', { token, signal });
+  return result.transactions;
+}
+
+export async function getTransaction(transactionId, token, { signal } = {}) {
+  const result = await requestJson(`/api/transactions/${encodeURIComponent(transactionId)}`, { token, signal });
+  return result.transaction;
+}
+
+export async function getPaymentStatus(transactionId, token, { signal } = {}) {
+  return requestJson(`/api/transactions/${encodeURIComponent(transactionId)}/payment-status`, { token, signal });
+}
+
+export async function createPayPalOrder(transactionId, token, expectedVersion) {
+  return requestJson(`/api/transactions/${encodeURIComponent(transactionId)}/paypal/order`, {
+    method: 'POST', token, body: { expectedVersion },
+  });
+}
+
+export async function authorizePayPalOrder(transactionId, token, expectedVersion) {
+  return requestJson(`/api/transactions/${encodeURIComponent(transactionId)}/paypal/authorize`, {
+    method: 'POST', token, body: { expectedVersion },
+  });
+}
+
+export async function reconcilePayPalPayment(transactionId, token) {
+  return requestJson(`/api/transactions/${encodeURIComponent(transactionId)}/paypal/reconcile`, {
+    method: 'POST', token,
+  });
 }
