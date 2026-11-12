@@ -25,8 +25,6 @@ function readConfig(env, { validatePort }) {
   if (!['development', 'test', 'production'].includes(nodeEnv)) {
     throw new TypeError('NODE_ENV must be development, test, or production.');
   }
-  const parsedPort = validatePort ? parseInteger(env, 'PORT', 3001, 1, 65535) : 3001;
-
   const configuredOrigins = env.FRONTEND_ORIGINS
     ?.split(',')
     .map((origin) => origin.trim())
@@ -39,10 +37,21 @@ function readConfig(env, { validatePort }) {
   if (nodeEnv === 'production' && !configuredMongoUri) {
     throw new TypeError('MONGODB_URI must be explicitly configured in production.');
   }
+  if (validatePort && nodeEnv === 'production' && (env.PORT === undefined || env.PORT === '')) {
+    throw new TypeError('PORT must be provided by the production hosting platform.');
+  }
+  const parsedPort = validatePort ? parseInteger(env, 'PORT', 3001, 1, 65535) : 3001;
+
+  const configuredHost = typeof env.HOST === 'string' ? env.HOST.trim() : '';
+  const host = configuredHost || (nodeEnv === 'production' ? '0.0.0.0' : '127.0.0.1');
+  if (nodeEnv === 'production' && host !== '0.0.0.0') {
+    throw new TypeError('HOST must be 0.0.0.0 in production.');
+  }
+
   return Object.freeze({
     nodeEnv,
     port: parsedPort,
-    host: env.HOST || (nodeEnv === 'production' ? '0.0.0.0' : '127.0.0.1'),
+    host,
     frontendOrigins: Object.freeze(configuredOrigins?.length ? configuredOrigins : DEFAULT_FRONTEND_ORIGINS),
     mongodbUri: configuredMongoUri || DEFAULT_MONGODB_URI,
     mongoServerSelectionTimeoutMs: parseInteger(env, 'MONGODB_SERVER_SELECTION_TIMEOUT_MS', 5000, 100, 60000),

@@ -12,6 +12,7 @@ test('configuration provides development defaults and reads database/auth settin
     FRONTEND_ORIGINS: 'https://safe.example,https://app.example',
   });
   assert.equal(config.nodeEnv, 'development');
+  assert.equal(getConfig({}).host, '127.0.0.1');
   assert.equal(config.mongodbUri, 'mongodb://localhost/safe_mandate');
   assert.equal(config.port, 3100);
   assert.deepEqual(config.frontendOrigins, ['https://safe.example', 'https://app.example']);
@@ -20,9 +21,19 @@ test('configuration provides development defaults and reads database/auth settin
 test('production requires an explicit MongoDB URI but no unrelated session secret', () => {
   const mongoUri = 'mongodb://user:pass@atlas-a.mongodb.net:27017,atlas-b.mongodb.net:27017/safe_mandate?replicaSet=atlas';
   assert.throws(() => getConfig({ NODE_ENV: 'production' }), /MONGODB_URI/);
-  const valid = getConfig({ NODE_ENV: 'production', MONGODB_URI: mongoUri });
+  assert.throws(() => getConfig({ NODE_ENV: 'production', MONGODB_URI: mongoUri }), /PORT/);
+  const valid = getConfig({ NODE_ENV: 'production', MONGODB_URI: mongoUri, PORT: '43127' });
   assert.equal(valid.nodeEnv, 'production');
+  assert.equal(valid.host, '0.0.0.0');
+  assert.equal(valid.port, 43127);
   assert.equal(valid.mongodbUri, mongoUri);
+});
+
+test('production only accepts an all-interface host, while development may explicitly bind elsewhere', () => {
+  const mongoUri = 'mongodb://user:pass@atlas-a.mongodb.net:27017/safe_mandate';
+  assert.equal(getConfig({ NODE_ENV: 'production', MONGODB_URI: mongoUri, PORT: '43128', HOST: '0.0.0.0' }).host, '0.0.0.0');
+  assert.throws(() => getConfig({ NODE_ENV: 'production', MONGODB_URI: mongoUri, PORT: '43128', HOST: '127.0.0.1' }), /HOST/);
+  assert.equal(getConfig({ HOST: '127.0.0.2' }).host, '127.0.0.2');
 });
 
 test('MongoDB URI parser accepts Atlas multi-host seed lists and identifies the configured database', () => {

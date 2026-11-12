@@ -59,6 +59,10 @@ From `server/`, run `npm run dev` to start the API on `http://127.0.0.1:3001` by
 
 Public endpoints are `GET /api/health`, `POST /api/mandates/validate`, and `POST /api/policy/evaluate`. Policy evaluation accepts a caller-supplied proposal and mandate and returns the deterministic result marked `evaluationOnly: true` and `authorizationGranted: false`; it is advisory and never creates a transaction or payment order.
 
+## Render backend deployment
+
+Create a Render **Web Service** from the repository with **Root Directory** `server`, **Build Command** `npm install`, and **Start Command** `npm start`. Configure `NODE_ENV=production`, `HOST=0.0.0.0`, and `MONGODB_URI` in the service's Environment settings. Production startup requires the platform-provided `PORT`; the application validates and uses that value without a Render-specific port hardcoded in source. Do not add a manual `PORT` override: Render assigns it (default `10000`). Remove any stale `HOST=127.0.0.1` or `PORT=3001` settings copied from local `.env.example`; local-only values in that file are not production defaults. Render's `.env not found` message is expected when variables are entered in the dashboard. Set `FRONTEND_ORIGINS` to the deployed frontend origin when it differs from the built-in local development origins. See [Render Web Services: port binding](https://render.com/docs/web-services#port-binding).
+
 Authenticated endpoints require `Authorization: Bearer <session token>` issued by `POST /api/auth/register` or `POST /api/auth/login`: `POST /api/auth/logout`, `GET /api/auth/session`, buyer-only mandate and transaction operations, and buyer-only `POST /api/ai/assessments`. The Agent page keeps the session token in component memory and sends it in the Authorization header; it does not store it in localStorage. The server derives actor identity from the session. Example requests are in `docs/backend-phase1.md`.
 
 ## AI Purchase Copilot
