@@ -118,3 +118,9 @@ Set-Location .\client
 npm test
 npm run build
 ```
+## Instructions : 
+
+Create or use a Safe Mandate buyer account and sign in.
+Open an eligible transaction and start PayPal Sandbox checkout.
+Sign in at PayPal with a Sandbox Personal test account, then approve the order.
+Return to Safe Mandate and confirm it reports authorization. Capture is a separate gated step.
