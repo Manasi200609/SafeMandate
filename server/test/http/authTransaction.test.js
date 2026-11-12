@@ -178,7 +178,9 @@ test('buyer and seller identities, roles, and transaction ownership are enforced
     const current = await request(baseUrl, 'GET', '/api/mandates/current', { token: buyer.token });
     assert.equal(current.status, 200);
     assert.equal(current.body.mandate.maxAmountMinor, MANDATE_BODY.maxAmountMinor);
-    assert.equal((await request(baseUrl, 'GET', '/api/mandates/current', { token: otherBuyer.token })).body.error.code, 'MANDATE_NOT_FOUND');
+    const missingMandate = await request(baseUrl, 'GET', '/api/mandates/current', { token: otherBuyer.token });
+    assert.equal(missingMandate.status, 200);
+    assert.equal(missingMandate.body.mandate, null);
     const reusedGuardian = await request(baseUrl, 'PUT', '/api/mandates/current', { token: otherBuyer.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId } } });
     assert.equal(reusedGuardian.status, 409);
     const update = await request(baseUrl, 'PUT', '/api/mandates/current', { token: buyer.token, body: { mandate: { ...MANDATE_BODY, guardianId: guardian.user.userId, maxAmountMinor: 1_600_000 } } });

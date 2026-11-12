@@ -43,10 +43,7 @@ export function createMandateService(repositories) {
       throw new ApiError(403, 'ROLE_NOT_PERMITTED', 'Only an authenticated buyer may read a mandate.');
     }
     const record = await repositories.mandates.findCurrentForBuyer(principal.userId);
-    if (!record) {
-      throw new ApiError(404, 'MANDATE_NOT_FOUND', 'No mandate is stored for this buyer.');
-    }
-    return record.payload;
+    return record?.payload ?? null;
   }
 
   return Object.freeze({ saveMandate, getCurrentMandate });

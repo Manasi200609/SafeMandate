@@ -74,6 +74,7 @@ export default function AgentPage() {
     setError('');
     try {
       const saved = await getCurrentMandate(sessionToken);
+      if (!saved) { setMandate(null); setMandateStatus('missing'); return; }
       const state = classifyPersistedMandate(saved);
       if (state !== 'ready') { setMandate(null); setMandateStatus(state); return; }
       setMandate(saved); setMandateStatus('ready'); setCategory(saved.allowedCategories[0] ?? '');

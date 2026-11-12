@@ -63,7 +63,7 @@ export async function signOut(token) {
 
 export async function getCurrentMandate(token) {
   const result = await requestJson('/api/mandates/current', { token });
-  return result.mandate;
+  return result.mandate ?? null;
 }
 
 export async function saveCurrentMandate(token, mandate) {
