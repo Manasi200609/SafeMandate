@@ -83,14 +83,19 @@ export async function loadPayPalSdkV6({ clientId = import.meta.env?.VITE_PAYPAL_
   return entry.promise;
 }
 
-export async function findPayPalEligibility(sdkInstance, transaction) {
+export async function findPayPalEligibility(sdkInstance, transaction, countryCode = import.meta.env?.VITE_PAYPAL_COUNTRY_CODE) {
   const amount = formatPayPalEligibilityAmount(transaction?.amountMinor, transaction?.currency);
   if (!amount || typeof transaction?.currency !== 'string') return false;
+  const normalizedCountry = typeof countryCode === 'string' && /^[A-Za-z]{2}$/.test(countryCode.trim())
+    ? countryCode.trim().toUpperCase()
+    : undefined;
   let cache = eligibilityCache.get(sdkInstance);
   if (!cache) { cache = new Map(); eligibilityCache.set(sdkInstance, cache); }
-  const key = `${transaction.currency}:${amount}`;
+  const key = `${normalizedCountry ?? 'auto'}:${transaction.currency}:${amount}`;
   if (!cache.has(key)) {
-    const request = Promise.resolve().then(() => sdkInstance.findEligibleMethods({ currencyCode: transaction.currency, amount }));
+    const input = { currencyCode: transaction.currency, amount };
+    if (normalizedCountry) input.countryCode = normalizedCountry;
+    const request = Promise.resolve().then(() => sdkInstance.findEligibleMethods(input));
     cache.set(key, request);
     request.catch(() => { if (cache.get(key) === request) cache.delete(key); });
   }

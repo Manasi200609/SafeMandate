@@ -85,6 +85,19 @@ test('PayPal eligibility uses exact persisted currency and amount values and cac
   assert.deepEqual(calls, [{ currencyCode: 'INR', amount: '1240.50' }]);
 });
 
+test('PayPal eligibility passes the configured Sandbox buyer country and isolates its cache', async () => {
+  const calls = [];
+  const sdk = { async findEligibleMethods(input) { calls.push(input); return { isEligible: () => true }; } };
+  const transaction = { amountMinor: 55000, currency: 'USD' };
+  assert.equal(await findPayPalEligibility(sdk, transaction, 'us'), true);
+  assert.equal(await findPayPalEligibility(sdk, transaction, 'US'), true);
+  assert.equal(await findPayPalEligibility(sdk, transaction), true);
+  assert.deepEqual(calls, [
+    { currencyCode: 'USD', amount: '550.00', countryCode: 'US' },
+    { currencyCode: 'USD', amount: '550.00' },
+  ]);
+});
+
 test('rejected eligibility checks are evicted so a later attempt can retry', async () => {
   let calls = 0;
   const sdk = { async findEligibleMethods() {
