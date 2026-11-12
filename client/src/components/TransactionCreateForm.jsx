@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, ArrowRight, CheckCircle2, LoaderCircle, Plus, ShieldCheck } from 'lucide-react';
 import StatusBadge from './StatusBadge.jsx';
-import { ApiRequestError, createTransaction, evaluateTransaction, getTransaction } from '../services/api.js';
+import { ApiRequestError, createTransaction, evaluateTransaction, getSellerChoices, getTransaction, registerSellerAccount, signOut } from '../services/api.js';
 import { CURRENCY_MINOR_UNITS } from '../data/currencyMeta.js';
 import { acquireSubmissionLock, parseMajorAmount, isValidLocalDate } from '../services/transactionDraft.js';
 
@@ -12,7 +12,7 @@ function todayLocal() {
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 }
 
-export default function TransactionCreateForm({ token, mandate, sellers, onCreated }) {
+export default function TransactionCreateForm({ token, mandate, sellers, onCreated, onSellerCreated }) {
   const { t } = useTranslation();
   const [sellerId, setSellerId] = useState('');
   const [itemName, setItemName] = useState('');
@@ -26,6 +26,11 @@ export default function TransactionCreateForm({ token, mandate, sellers, onCreat
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState(null);
+  const [sellerEmail, setSellerEmail] = useState('');
+  const [sellerPassword, setSellerPassword] = useState('');
+  const [sellerSetupBusy, setSellerSetupBusy] = useState(false);
+  const [sellerSetupError, setSellerSetupError] = useState('');
+  const [sellerSetupMessage, setSellerSetupMessage] = useState('');
   const busyRef = useRef(false);
   const minorUnits = CURRENCY_MINOR_UNITS[mandate?.currency];
   const step = minorUnits === 0 ? '1' : minorUnits === 3 ? '0.001' : '0.01';
@@ -97,12 +102,50 @@ export default function TransactionCreateForm({ token, mandate, sellers, onCreat
     setBusy(false);
   }
 
+  async function handleSellerRegistration(event) {
+    event.preventDefault();
+    if (sellerSetupBusy) return;
+    setSellerSetupBusy(true);
+    setSellerSetupError('');
+    setSellerSetupMessage('');
+    let sellerSession;
+    try {
+      sellerSession = await registerSellerAccount(sellerEmail.trim(), sellerPassword);
+      if (sellerSession?.user?.role !== 'seller' || typeof sellerSession?.token !== 'string') {
+        throw new ApiRequestError({ status: 502, code: 'SELLER_ACCOUNT_SETUP_FAILED', message: t('transactionCreate.sellerSetupFailed') });
+      }
+      await signOut(sellerSession.token);
+      sellerSession = null;
+      setSellerPassword('');
+      const updatedSellers = await getSellerChoices(token);
+      if (onSellerCreated) await onSellerCreated(updatedSellers);
+      setSellerSetupMessage(t('transactionCreate.sellerCreated'));
+    } catch (failure) {
+      if (sellerSession?.token) await signOut(sellerSession.token).catch(() => {});
+      setSellerSetupError(failure instanceof ApiRequestError && failure.code === 'EMAIL_IN_USE'
+        ? t('transactionCreate.sellerEmailInUse')
+        : failure instanceof ApiRequestError ? failure.message : t('transactionCreate.sellerSetupFailed'));
+    } finally {
+      setSellerSetupBusy(false);
+    }
+  }
+
   const resultState = notice?.transaction?.state;
   return <section className="panel transaction-create-panel">
     <div className="transaction-create-heading"><div className="copilot-auth-icon"><Plus size={18}/></div><div><span className="eyebrow">{t('transactionCreate.eyebrow')}</span><h2>{t('transactionCreate.title')}</h2><p>{t('transactionCreate.description')}</p></div></div>
     {!mandate ? <div className="transaction-create-prerequisite" role="status"><ShieldCheck size={17}/><span>{t('transactionCreate.mandateRequired')}</span></div> : <>
       <div className="transaction-create-mandate"><ShieldCheck size={15}/><span>{t('transactionCreate.mandateLabel')}</span><b>{mandate.currency} · {t('transactionCreate.limit', { amount: (mandate.maxAmountMinor / (10 ** minorUnits)).toLocaleString(undefined, { minimumFractionDigits: minorUnits, maximumFractionDigits: minorUnits }) })}</b><small>{t('transactionCreate.timezone', { timezone: mandate.meetupRules.timeZone })}</small></div>
-      {!sellers.length && <p className="transaction-create-prerequisite" role="status">{t('transactionCreate.noSellers')}</p>}
+      {!sellers.length && <div className="transaction-create-seller-setup">
+        <p className="transaction-create-prerequisite" role="status">{t('transactionCreate.noSellers')}</p>
+        <div className="transaction-create-seller-copy"><b>{t('transactionCreate.sellerSetupTitle')}</b><p>{t('transactionCreate.sellerSetupBody')}</p></div>
+        <form className="transaction-create-seller-form" onSubmit={handleSellerRegistration}>
+          <label>{t('mandateSetup.email')}<input type="email" autoComplete="email" value={sellerEmail} onChange={(event) => setSellerEmail(event.target.value)} required maxLength={254} disabled={sellerSetupBusy}/></label>
+          <label>{t('mandateSetup.password')}<input type="password" autoComplete="new-password" value={sellerPassword} onChange={(event) => setSellerPassword(event.target.value)} required minLength={12} maxLength={200} disabled={sellerSetupBusy}/><small>{t('transactionCreate.sellerPasswordHelp')}</small></label>
+          <button type="submit" className="button button-outline" disabled={sellerSetupBusy}>{sellerSetupBusy ? <LoaderCircle size={15} className="payment-spinner"/> : <Plus size={15}/ >}{sellerSetupBusy ? t('transactionCreate.sellerCreating') : t('transactionCreate.sellerCreate')}</button>
+        </form>
+        {sellerSetupError && <p className="payment-flow-error" role="alert"><AlertTriangle size={15}/>{sellerSetupError}</p>}
+        {sellerSetupMessage && <p className="transaction-create-seller-success" role="status"><CheckCircle2 size={15}/>{sellerSetupMessage}</p>}
+      </div>}
       <form className="transaction-create-form" onSubmit={handleSubmit}>
         <label>{t('transactionCreate.seller')}<select value={sellerId} onChange={(event) => setSellerId(event.target.value)} required disabled={!canCreate}><option value="">{t('transactionCreate.chooseSeller')}</option>{sellers.map((seller) => <option value={seller.sellerId} key={seller.sellerId}>{seller.displayName}</option>)}</select></label>
         <label>{t('ai.itemName')}<input value={itemName} onChange={(event) => setItemName(event.target.value)} maxLength={180} required disabled={!canCreate}/></label>

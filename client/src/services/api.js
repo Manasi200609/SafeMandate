@@ -57,6 +57,10 @@ export async function registerBuyerAccount(email, password) {
   return requestJson('/api/auth/register', { method: 'POST', body: { email, password, role: 'buyer' } });
 }
 
+export async function registerSellerAccount(email, password) {
+  return requestJson('/api/auth/register', { method: 'POST', body: { email, password, role: 'seller' } });
+}
+
 export async function signOut(token) {
   if (token) await requestJson('/api/auth/logout', { method: 'POST', token });
 }
