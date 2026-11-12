@@ -21,7 +21,8 @@ export function createConfiguredPayPalAdapterFactory({ env = () => process.env, 
     const merchantId = values.PAYPAL_MERCHANT_ID;
     const returnUrl = values.PAYPAL_RETURN_URL;
     const cancelUrl = values.PAYPAL_CANCEL_URL;
-    if (!clientId || !clientSecret || !/^[A-Za-z0-9_-]{1,128}$/.test(merchantId ?? '')
+    // PayPal Orders v2 defines merchant_id as a 13-character account_id.
+    if (!clientId || !clientSecret || !/^[2-9A-HJ-NP-Z]{13}$/.test(merchantId ?? '')
       || !validCallbackUrl(returnUrl) || !validCallbackUrl(cancelUrl)) throw new PayPalConfigurationError();
     try {
       const transport = createPayPalTransport({ clientId, clientSecret, baseUrl, ...(fetchImpl ? { fetchImpl } : {}) });

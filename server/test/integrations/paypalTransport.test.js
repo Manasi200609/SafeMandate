@@ -49,6 +49,22 @@ test('PayPal OAuth failures are sanitized and live hosts are rejected', async ()
   assert.throws(() => createPayPalTransport({ clientId: 'id', clientSecret: 'secret', baseUrl: 'https://api-m.paypal.com' }), /Sandbox/);
 });
 
+test('PayPal HTTP errors prefer the specific sanitized details issue over the generic response name', async () => {
+  let calls = 0;
+  const transport = createPayPalTransport({ clientId: 'id', clientSecret: 'secret', fetchImpl: async () => {
+    calls += 1;
+    return calls === 1
+      ? response(200, { access_token: 'token', expires_in: 3600 })
+      : response(400, { name: 'INVALID_REQUEST', message: 'Sensitive provider text', details: [{ issue: 'INVALID_PAYEE', description: 'Sensitive detail' }] });
+  } });
+  await assert.rejects(transport.request('POST', '/v2/checkout/orders', {}, { requestId: 'order-v1' }), (error) => {
+    assert.equal(error.status, 400);
+    assert.equal(error.issue, 'INVALID_PAYEE');
+    assert.equal(error.message.includes('Sensitive'), false);
+    return true;
+  });
+});
+
 test('ambiguous provider transport failures are surfaced without automatic mutation retry', async () => {
   let calls = 0;
   const transport = createPayPalTransport({ clientId: 'id', clientSecret: 'secret', fetchImpl: async () => {

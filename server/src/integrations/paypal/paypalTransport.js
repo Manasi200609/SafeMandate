@@ -47,7 +47,10 @@ export function createPayPalTransport({ clientId, clientSecret, baseUrl = SANDBO
       let data;
       try { data = await response.json(); } catch { data = null; }
       if (!response.ok || typeof data?.access_token !== 'string' || !Number.isFinite(data?.expires_in) || data.expires_in <= 0) {
-        const rawIssue = typeof data?.error === 'string' ? data.error.toUpperCase().replaceAll('-', '_') : '';
+        // PayPal's top-level name is often just INVALID_REQUEST; details[].issue
+        // contains the actionable schema/business validation code.
+        const providerIssue = data?.details?.find((detail) => typeof detail?.issue === 'string')?.issue ?? data?.error ?? data?.name;
+        const rawIssue = typeof providerIssue === 'string' ? providerIssue.toUpperCase().replaceAll('-', '_') : '';
         const issue = /^[A-Z0-9_]{1,64}$/.test(rawIssue) ? rawIssue : 'OAUTH_FAILED';
         throw new PayPalApiError({ status: response.status, issue });
       }
@@ -87,7 +90,9 @@ export function createPayPalTransport({ clientId, clientSecret, baseUrl = SANDBO
       if (response.status === 401) cachedToken = null;
       throw new PayPalApiError({
         status: response.status,
-        issue: String(data?.name ?? data?.details?.[0]?.issue ?? 'PROVIDER_ERROR').toUpperCase().replaceAll('-', '_'),
+        // PayPal's top-level name is often just INVALID_REQUEST; details[].issue
+        // contains the actionable schema/business validation code.
+        issue: String(data?.details?.find((detail) => typeof detail?.issue === 'string')?.issue ?? data?.error ?? data?.name ?? 'PROVIDER_ERROR').toUpperCase().replaceAll('-', '_'),
         debugId: response.headers.get('paypal-debug-id'),
       });
     }
