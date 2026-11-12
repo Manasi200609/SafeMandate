@@ -1,0 +1,73 @@
+.payment-auth-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px 16px;
+  width: min(100%, 980px);
+  margin: 28px auto 20px;
+  padding: clamp(20px, 3vw, 30px);
+}
+
+.payment-auth-card .copilot-auth-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: var(--lime);
+  border: 1px solid rgba(22, 214, 207, .28);
+  border-radius: 12px;
+  background: rgba(22, 214, 207, .08);
+}
+
+.payment-auth-card > div:nth-child(2) { min-width: 0; }
+.payment-auth-card h2 { margin: 5px 0 7px; font-size: clamp(19px, 2vw, 24px); }
+.payment-auth-card > div:nth-child(2) > p { max-width: 680px; margin: 0; color: #9daec1; font-size: 13px; line-height: 1.6; }
+
+.payment-auth-card .copilot-auth-form {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+  width: 100%;
+  max-width: none;
+  margin-top: 8px;
+}
+
+.payment-auth-card .copilot-auth-form label {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  color: #aab7c8;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.payment-auth-card .copilot-auth-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid rgba(119, 141, 170, .3);
+  border-radius: 9px;
+  background: #080e10;
+  color: #f2f7f6;
+  font: inherit;
+}
+
+.payment-auth-card .copilot-auth-form input:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+.payment-auth-card .copilot-auth-form .button { min-height: 46px; white-space: nowrap; }
+.payment-auth-signup { grid-column: 2; margin: 0; color: #9daec1; font-size: 12px; }
+.payment-auth-signup a { margin-left: 5px; color: var(--lime); font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.payment-auth-card .copilot-error { grid-column: 1 / -1; }
+
+@media (max-width: 720px) {
+  .payment-auth-card { grid-template-columns: 34px minmax(0, 1fr); gap: 10px; margin: 16px 0; padding: 18px 16px; }
+  .payment-auth-card .copilot-auth-icon { width: 34px; height: 34px; }
+  .payment-auth-card .copilot-auth-form { grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr); gap: 11px; margin-top: 5px; }
+  .payment-auth-card .copilot-auth-form .button { width: 100%; }
+  .payment-auth-signup { grid-column: 1 / -1; }
+}

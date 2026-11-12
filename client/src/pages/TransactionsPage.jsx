@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { AlertTriangle, LoaderCircle, LockKeyhole, LogIn, LogOut, RefreshCw, Search, ShoppingBag } from 'lucide-react';
 import PageFrame from '../components/PageFrame.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -8,6 +9,7 @@ import { money, dateLabel, numberLabel } from '../services/format.js';
 import TransactionCreateForm from '../components/TransactionCreateForm.jsx';
 import PayPalV6CheckoutButton from '../components/PayPalV6CheckoutButton.jsx';
 import { canStartPayPalCheckout } from '../services/transactionDraft.js';
+import './TransactionsPage.css';
 
 export default function TransactionsPage() {
   const { t } = useTranslation();
@@ -85,6 +87,7 @@ export default function TransactionsPage() {
         <label>{t('ai.password')}<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required maxLength={256}/></label>
         <button type="submit" className="button button-lime" disabled={busy}>{busy ? <LoaderCircle size={15} className="payment-spinner"/> : <LogIn size={15}/>}{busy ? t('paypalCheckout.signingIn') : t('ai.signIn')}</button>
       </form>
+      <p className="payment-auth-signup">{t('mandateSetup.needAccount')} <Link to="/app/mandate">{t('mandateSetup.createBuyerAccount')}</Link></p>
       {error && <p className="copilot-error" role="alert"><AlertTriangle size={15}/>{error}</p>}
     </section> : <>
       <TransactionCreateForm token={token} mandate={mandate} sellers={sellers} onCreated={refreshTransactions}/>

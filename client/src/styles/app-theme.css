@@ -201,3 +201,27 @@ html,body,#root{background:#070D19;color:#F2F0E8}body{background:#070D19;color:#
 @media(max-width:1120px){.fin-dashboard-grid{grid-template-rows:190px 205px minmax(228px,auto) minmax(190px,auto);grid-template-areas:'balance review history' 'budget protection history' 'active outcomes history' 'guardian agent category'}}
 @media(max-width:820px){.fin-dashboard-grid{grid-template-rows:auto;grid-template-areas:'balance balance' 'review protection' 'budget budget' 'outcomes category' 'active active' 'guardian agent' 'history history'}.fin-dashboard-grid>.fin-category-widget{grid-area:category;min-height:164px}.fin-outcome-chart{height:90px}}
 @media(max-width:520px){.fin-dashboard-grid{grid-template-areas:'balance balance' 'review review' 'protection protection' 'budget budget' 'outcomes category' 'active active' 'guardian guardian' 'agent agent' 'history history'}.fin-dashboard-grid>.fin-widget{padding:12px}.fin-widget-head h2{font-size:12px}.fin-category-content{min-height:132px}.fin-category-chart{height:90px}.fin-outcome-chart{height:87px}}
+
+/* The app keeps a fixed side navigation on tablet widths, so switch the dashboard
+   before the remaining content area becomes too narrow for its desktop grid. */
+@media (min-width: 701px) and (max-width: 1300px) {
+  .fin-dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: auto;
+    grid-template-areas:
+      'balance balance'
+      'review protection'
+      'budget budget'
+      'outcomes category'
+      'active active'
+      'guardian agent'
+      'history history';
+  }
+  .fin-dashboard-grid > .fin-category-widget { grid-area: category; grid-column: auto; min-width: 0; }
+  .fin-dashboard-grid > .fin-widget { min-width: 0; }
+}
+
+@media (max-width: 700px) {
+  .fin-dashboard-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'balance' 'review' 'protection' 'budget' 'outcomes' 'category' 'active' 'guardian' 'agent' 'history'; }
+  .fin-dashboard-grid > .fin-category-widget { grid-column: auto; }
+}
