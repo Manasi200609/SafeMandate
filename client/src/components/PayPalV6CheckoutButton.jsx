@@ -136,7 +136,7 @@ export default function PayPalV6CheckoutButton({ transaction, token, onRefresh, 
 
   useEffect(() => {
     const button = buttonRef.current;
-    if (!button || !eligible || !canCheckout || !session || state !== 'ready' && state !== 'cancelled' && state !== 'error') return undefined;
+    if (!button || !eligible || !canCheckout || !session || !['ready', 'cancelled', 'error', 'eligibility-warning'].includes(state)) return undefined;
     const start = (event) => {
       event.preventDefault();
       event.stopPropagation();
