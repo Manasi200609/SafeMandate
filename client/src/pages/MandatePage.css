@@ -3,20 +3,21 @@
 @media(max-width:520px){.mandate-auth{padding:20px}.mandate-auth-form,.mandate-field-grid,.guardian-accept-grid{grid-template-columns:1fr}.guardian-accept-grid .mandate-field:first-child,.mandate-field-grid .wide{grid-column:auto}.mandate-categories{grid-template-columns:1fr 1fr}.mandate-form-panel{padding:17px}.mandate-toolbar{align-items:flex-start;gap:10px;flex-direction:column}.mandate-toolbar>div{width:100%}.mandate-toolbar .button{flex:1;justify-content:center}.guardian-action{align-items:stretch;flex-direction:column}.guardian-action .button{justify-content:center}.mandate-auth-form .button{grid-column:auto}}
 @media(prefers-reduced-motion:reduce){.spin{animation:none}}
 
-/* Keep the four editor sections in the wide column; the compact summary stays alongside them. */
-.mandate-editor{grid-template-columns:minmax(0,1fr) minmax(270px,310px);align-items:start}
+/* Keep the form sections together so grid auto-placement cannot put one in the narrow summary column. */
+.mandate-page .mandate-editor{grid-template-columns:minmax(0,1fr) minmax(270px,310px);align-items:start}
 .mandate-auth-toggle{grid-column:1/-1;justify-self:start}
-.mandate-editor>.mandate-form-panel{grid-column:1}
-.mandate-editor>.mandate-summary-card{grid-column:2;grid-row:1 / span 4;align-self:start}
-.mandate-categories{grid-template-columns:repeat(3,minmax(0,1fr))}
-.mandate-categories label{min-width:0;overflow-wrap:anywhere}
+.mandate-page .mandate-form-column{grid-column:1;grid-row:1;display:grid;gap:0;min-width:0}
+.mandate-page .mandate-form-panel{min-width:0}
+.mandate-page .mandate-summary-card{grid-column:2;grid-row:1;align-self:start;min-width:0}
+.mandate-page .mandate-categories{grid-template-columns:repeat(3,minmax(0,1fr))}
+.mandate-page .mandate-categories label{min-width:0;overflow-wrap:anywhere}
 .amount-entry{grid-template-columns:minmax(0,1fr) minmax(112px,130px)}
 @media(max-width:800px){
-  .mandate-editor{grid-template-columns:minmax(0,1fr)}
-  .mandate-editor>.mandate-form-panel{grid-column:1;grid-row:auto}
-  .mandate-editor>.mandate-summary-card{grid-column:1;grid-row:1;position:static}
+  .mandate-page .mandate-editor{grid-template-columns:minmax(0,1fr)}
+  .mandate-page .mandate-form-column{grid-column:1;grid-row:2}
+  .mandate-page .mandate-summary-card{grid-column:1;grid-row:1;position:static}
 }
 @media(max-width:520px){
-  .mandate-categories{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mandate-page .mandate-categories{grid-template-columns:repeat(2,minmax(0,1fr))}
   .amount-entry{grid-template-columns:minmax(0,1fr) 112px}
 }
