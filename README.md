@@ -1,4 +1,5 @@
 # Safe Mandate
+(instructions at the end)
 
 **Autonomous purchasing. Human-controlled money.**
 
@@ -120,7 +121,49 @@ npm run build
 ```
 ## Instructions : 
 
-Create or use a Safe Mandate buyer account and sign in.
-Open an eligible transaction and start PayPal Sandbox checkout.
-Sign in at PayPal with a Sandbox Personal test account, then approve the order.
-Return to Safe Mandate and confirm it reports authorization. Capture is a separate gated step.
+Here are the **working-account steps**. Use separate emails for each Safe Mandate account.
+
+### 1. Create Buyer A and Buyer B
+
+1. Open [Safe Mandate](https://safemandate.vercel.app/app/mandate).
+2. Choose **Create buyer account** and register **Buyer A**.
+3. Sign out, then register **Buyer B** the same way.
+
+Buyer B is the invitee. Accepting the invitation changes B’s Safe Mandate role to **guardian**, so B won’t be the buyer who creates the purchase.
+
+### 2. Invite Buyer B as Buyer A’s guardian
+
+1. Sign in as **Buyer A** and open **Mandate**.
+2. Enter Buyer B’s email under **Invite an existing account by email** and send the invitation.
+3. Copy the displayed **relationship ID**.
+4. Expand **Accept a guardian invitation**. Enter the relationship ID plus **Buyer B’s email and password**, then accept.
+5. Back in Buyer A’s mandate form, refresh the guardian list and select Buyer B.
+
+The invitee must already have an account. The app does not send an invitation email; you pass the relationship ID to the invitee yourself.
+
+### 3. Save Buyer A’s mandate
+
+As **Buyer A**, complete the mandate and save it. Choose the currency, spending limit, categories, and meetup rules you’ll use for your demo.
+
+### 4. Create or choose a seller
+
+Still signed in as **Buyer A**, open **Transactions**.
+
+- If a seller appears in **Existing seller account**, choose that seller.
+- If no seller appears, use **Create a seller account** on the Transactions page. Register a third Safe Mandate account with a different email. It will appear in the seller list after creation.
+
+Create the seller **before** submitting the purchase proposal. You don’t need to sign in as the seller to submit it.
+
+### 5. Create and pay for a proposal
+
+As **Buyer A**, on **Transactions**:
+
+1. Choose the seller.
+2. Enter the item, description, amount, allowed category, and meetup details.
+3. Keep the amount within Buyer A’s mandate and use a meetup date/time that satisfies its rules.
+4. Submit the proposal. The app evaluates it.
+5. If it reaches **Ready for payment**, start PayPal checkout and sign in there with a separate **PayPal Sandbox Personal buyer** account. Approve on PayPal’s checkout page.
+
+The Safe Mandate buyer, guardian, seller, and PayPal Sandbox buyer are distinct roles/accounts.
+
+**Demo limitation:** the guardian invitation and acceptance flow is connected, but `/guardian/demo-review` is a sample preview, not a real persisted guardian-approval screen. For a smooth payment demo, use a proposal that satisfies the mandate and reaches **Ready for payment** without needing an exception approval. PayPal checkout in this flow requests authorization; it does not itself mean payment was captured.
